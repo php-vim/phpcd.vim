@@ -34,39 +34,21 @@ class PHPCD extends RpcServer
      */
     public function location($class_name, $method_name = null)
     {
-        if ($class_name) {
-            return $this->locationClass($class_name, $method_name);
-        } else {
-            return $this->locationFunction($method_name);
-        }
-    }
-
-    private function locationClass($class_name, $method_name = null)
-    {
         try {
-            $class = new ReflectionClass($class_name);
-            if (!$method_name) {
-                return [
-                    $class->getFileName(),
-                    $class->getStartLine(),
-                ];
+            if ($class_name) {
+                $reflection = new ReflectionClass($class_name);
+                if ($method_name) {
+                    $reflection = $reflection->getMethod($method_name);
+                }
+            } else {
+                $reflection = new ReflectionFunction($method_name);
             }
 
-            $method  = $class->getMethod($method_name);
-
-            if ($method) {
-                return [
-                    $method->getFileName(),
-                    $method->getStartLine(),
-                ];
-            }
+            return [$reflection->getFileName(), $reflection->getStartLine()];
         } catch (ReflectionException $e) {
+            $this->log((string) $e);
+            return ['', null];
         }
-
-        return [
-            '',
-            null,
-        ];
     }
 
     /**
@@ -75,17 +57,26 @@ class PHPCD extends RpcServer
      * @param string $class_name 类名，传空值则表示第二个参数为函数名
      * @param string $name 函数名或者成员名
      */
-    public function doc($class_name, $name)
+    private function doc($class_name, $name)
     {
-        if ($class_name && $name) {
-            list($path, $doc) = $this->docClass($class_name, $name);
-        } elseif ($name) {
-            list($path, $doc) = $this->docFunction($name);
-        }
+        try {
+            if ($class_name) {
+                $reflection = new ReflectionClass($class_name);
+                if ($reflection->hasProperty($name)) {
+                    $reflection = $reflection->getProperty($name);
+                } else {
+                    $reflection = $reflection->getMethod($name);
+                }
+            } else {
+                $reflection = new ReflectionFunction($name);
+            }
 
-        if ($doc) {
+            $path = $reflection->getFileName();
+            $doc = $reflection->getDocComment();
+
             return [$path, $this->clearDoc($doc)];
-        } else {
+        } catch (ReflectionException $e) {
+            $this->log((string) $e);
             return [null, null];
         }
     }
@@ -149,7 +140,6 @@ class PHPCD extends RpcServer
     {
         if (version_compare(PHP_VERSION, '7.0.0') >= 0) {
             $type = $this->typeByReturnType($class_name, $name);
-            $this->log($type);
             if ($type) {
                 return [$type];
             }
@@ -351,8 +341,6 @@ class PHPCD extends RpcServer
         ];
     }
 
-    // private function isAvailable()
-
     private function getMethodInfo($method, $pattern = null)
     {
         $name = $method->getName();
@@ -376,7 +364,6 @@ class PHPCD extends RpcServer
 
     /**
      *
-     *
      * @return array
      */
     private function getModifierSymbols()
@@ -399,51 +386,6 @@ class PHPCD extends RpcServer
         }
 
         return $signs;
-    }
-
-    private function locationFunction($name)
-    {
-        $func = new ReflectionFunction($name);
-        return [
-            $func->getFileName(),
-            $func->getStartLine(),
-        ];
-    }
-
-    private function docClass($class_name, $name)
-    {
-        if (!class_exists($class_name)) {
-            return ['', ''];
-        }
-
-        $class = new ReflectionClass($class_name);
-        if ($class->hasProperty($name)) {
-            $property = $class->getProperty($name);
-            return [
-                $class->getFileName(),
-                $property->getDocComment()
-            ];
-        } elseif ($class->hasMethod($name)) {
-            $method = $class->getMethod($name);
-            return [
-                $class->getFileName(),
-                $method->getDocComment()
-            ];
-        }
-    }
-
-    private function docFunction($name)
-    {
-        if (!function_exists($name)) {
-            return ['', ''];
-        }
-
-        $function = new ReflectionFunction($name);
-
-        return [
-            $function->getFileName(),
-            $function->getDocComment()
-        ];
     }
 
     private function clearDoc($doc)
