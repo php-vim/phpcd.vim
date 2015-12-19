@@ -9,15 +9,15 @@ class ReflectionClass extends \ReflectionClass
      * depending on context
      *
      * @param bool|null $static Show static|non static|both types
-     * @param bool publicOnly restrict the result to public methods
+     * @param bool public_only restrict the result to public methods
      * @return ReflectionMethod[]
      */
-    public function getAvailableMethods($static, $publicOnly = false)
+    public function getAvailableMethods($static, $public_only = false)
     {
         $methods = $this->getMethods();
 
         foreach ($methods as $key => $method) {
-            if (false === $this->filter($method, $static, $publicOnly)) {
+            if (false === $this->filter($method, $static, $public_only)) {
                 unset($methods[$key]);
             }
         }
@@ -28,7 +28,7 @@ class ReflectionClass extends \ReflectionClass
     /**
      * @return bool
      */
-    private function filter(\ReflectionMethod $method, $static, $publicOnly)
+    private function filter(\ReflectionMethod $method, $static, $public_only)
     {
         if ($static !== null && ($method->isStatic() xor $static)) {
             return false;
@@ -38,7 +38,7 @@ class ReflectionClass extends \ReflectionClass
             return true;
         }
 
-        if ($publicOnly) {
+        if ($public_only) {
             return false;
         }
 

@@ -15,10 +15,10 @@ class PHPCD extends RpcServer
 
 
     /**
-     * @param string $isStatic
+     * @param string $is_static
      * @return bool|null
      */
-    private function translateIsStaticInput($isStatic)
+    private function translateis_staticInput($is_static)
     {
         $map = [
             'both'           => null,
@@ -26,14 +26,14 @@ class PHPCD extends RpcServer
             'only_static'    => true
         ];
 
-        return isset($map[$isStatic]) ? $map[$isStatic] : null;
+        return isset($map[$is_static]) ? $map[$is_static] : null;
     }
 
 
-    public function info($class_name, $pattern, $isStatic = 'both', $publicInfoOnly)
+    public function info($class_name, $pattern, $is_static = 'both', $publicInfoOnly)
     {
         if ($class_name) {
-            return $this->classInfo($class_name, $pattern, $this->translateIsStaticInput($isStatic), $publicInfoOnly);
+            return $this->classInfo($class_name, $pattern, $this->translateis_staticInput($is_static), $publicInfoOnly);
         }
 
         if ($pattern) {
@@ -245,7 +245,7 @@ class PHPCD extends RpcServer
         'void'     => 1,
     ];
 
-    private function classInfo($class_name, $pattern, $isStatic, $publicInfoOnly)
+    private function classInfo($class_name, $pattern, $is_static, $publicInfoOnly)
     {
         $reflection = new \Reflection\ReflectionClass($class_name);
         $items = [];
@@ -259,7 +259,7 @@ class PHPCD extends RpcServer
             ];
         }
 
-        $methods = $reflection->getAvailableMethods($isStatic, $publicInfoOnly);
+        $methods = $reflection->getAvailableMethods($is_static, $publicInfoOnly);
 
         foreach ($methods as $method) {
             $info = $this->getMethodInfo($method, $pattern);
@@ -268,7 +268,7 @@ class PHPCD extends RpcServer
             }
         }
 
-        if ($isStatic) {
+        if ($is_static) {
             $properties = $reflection->getProperties(ReflectionProperty::IS_STATIC);
         } else {
             $properties = $reflection->getProperties();
