@@ -79,9 +79,13 @@ class PHPCD extends RpcServer
     private function doc($class_name, $name)
     {
         try {
+            $reflection_class = null;
             if ($class_name) {
                 $reflection = new ReflectionClass($class_name);
                 if ($reflection->hasProperty($name)) {
+                    $reflection_class = $reflection;
+                    // ReflectionProperty does not have the getFileName method
+                    // use ReflectionClass instead
                     $reflection = $reflection->getProperty($name);
                 } else {
                     $reflection = $reflection->getMethod($name);
@@ -90,7 +94,7 @@ class PHPCD extends RpcServer
                 $reflection = new ReflectionFunction($name);
             }
 
-            $path = $reflection->getFileName();
+            $path = ($reflection_class ?: $reflection)->getFileName();
             $doc = $reflection->getDocComment();
 
             return [$path, $this->clearDoc($doc)];
