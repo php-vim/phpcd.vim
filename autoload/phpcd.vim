@@ -53,11 +53,21 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 
 		if context =~ '\(->\|::\)$' " {{{
 			let classname = phpcd#GetClassName(line('.'), context, current_namespace, imports)
-			let only_static = 0
-			if stridx(context, 'parent') != 0 && strridx(context, '::') > 0
-				let only_static = 1
+
+			" TODO Fix it for variables with reference to $this etc.
+			let public_only = (context !~# '^\(\$this\|self\|static\|parent\)' )
+
+			let is_static = 'only_nonstatic'
+
+			if strridx(context, '::') > 0
+				if stridx(context, 'parent') != 0
+					let is_static = 'only_static'
+				else
+					let is_static = 'both'
+				endif
 			endif
-			return rpcrequest(g:phpcd_channel_id, 'info', classname, a:base, only_static)
+
+			return rpcrequest(g:phpcd_channel_id, 'info', classname, a:base, is_static, public_only)
 		elseif context =~? 'implements'
 			" TODO complete class Foo implements
 		elseif context =~? 'extends\s\+.\+$' && a:base == ''

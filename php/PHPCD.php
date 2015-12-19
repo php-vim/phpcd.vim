@@ -13,15 +13,34 @@ class PHPCD extends RpcServer
         ReflectionMethod::IS_STATIC     => '@'
     ];
 
-    public function info($class_name, $pattern, $mode)
+
+    /**
+     * @param string $isStatic
+     * @return bool|null
+     */
+    private function translateIsStaticInput($isStatic)
+    {
+        $map = [
+            'both'           => null,
+            'only_nonstatic' => false,
+            'only_static'    => true
+        ];
+
+        return isset($map[$isStatic]) ? $map[$isStatic] : null;
+    }
+
+
+    public function info($class_name, $pattern, $isStatic = 'both', $publicInfoOnly)
     {
         if ($class_name) {
-            return $this->classInfo($class_name, $pattern, $mode);
-        } elseif($pattern) {
-            return $this->functionOrConstantInfo($pattern);
-        } else {
-            return [];
+            return $this->classInfo($class_name, $pattern, $this->translateIsStaticInput($isStatic), $publicInfoOnly);
         }
+
+        if ($pattern) {
+            return $this->functionOrConstantInfo($pattern);
+        }
+
+        return [];
     }
 
     /**
@@ -222,9 +241,9 @@ class PHPCD extends RpcServer
         'void'     => 1,
     ];
 
-    private function classInfo($class_name, $pattern, $mode)
+    private function classInfo($class_name, $pattern, $isStatic, $publicInfoOnly)
     {
-        $reflection = new ReflectionClass($class_name);
+        $reflection = new \Reflection\ReflectionClass($class_name);
         $items = [];
 
         foreach ($reflection->getConstants() as $name => $value) {
@@ -236,11 +255,8 @@ class PHPCD extends RpcServer
             ];
         }
 
-        if ($mode == 1) {
-            $methods = $reflection->getMethods(ReflectionMethod::IS_STATIC);
-        } else {
-            $methods = $reflection->getMethods();
-        }
+        $methods = $reflection->getAvailableMethods($isStatic, $publicInfoOnly);
+
         foreach ($methods as $method) {
             $info = $this->getMethodInfo($method, $pattern);
             if ($info) {
@@ -248,7 +264,7 @@ class PHPCD extends RpcServer
             }
         }
 
-        if ($mode == 1) {
+        if ($isStatic) {
             $properties = $reflection->getProperties(ReflectionProperty::IS_STATIC);
         } else {
             $properties = $reflection->getProperties();
@@ -393,5 +409,4 @@ class PHPCD extends RpcServer
         $doc = preg_replace('/[ \t]*\* ?/m','', $doc);
         return preg_replace('#\s*\/|/\s*#','', $doc);
     }
-
 }
