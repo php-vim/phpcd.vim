@@ -1,6 +1,7 @@
 function! phpcd#CompletePHP(findstart, base) " {{{
 	" we need to wait phpcd {{{
-	if g:phpcd_channel_id < 0
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
 		return
 	endif " }}}
 
@@ -67,7 +68,7 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 				endif
 			endif
 
-			return rpcrequest(g:phpcd_channel_id, 'info', classname, a:base, is_static, public_only)
+			return rpcrequest(phpcd_channel_id, 'info', classname, a:base, is_static, public_only)
 		elseif context =~? 'implements'
 			" TODO complete class Foo implements
 		elseif context =~? 'extends\s\+.\+$' && a:base == ''
@@ -91,13 +92,19 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 endfunction " }}}
 
 function! phpcd#CompleteGeneral(base, current_namespace, imports) " {{{
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
+		return
+	endif
+
 	let base = substitute(a:base, '^\\', '', '')
 	let [pattern, namespace] = phpcd#ExpandClassName(a:base, a:current_namespace, a:imports)
-	return rpcrequest(g:phpcd_channel_id, 'info', '', pattern)
+	return rpcrequest(phpcd_channel_id, 'info', '', pattern)
 endfunction " }}}
 
 function! phpcd#JumpToDefinition(mode) " {{{
-	if g:phpcd_channel_id < 0
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
 		return
 	endif
 
@@ -180,6 +187,14 @@ function! phpcd#GetCurrentSymbolWithContext() " {{{
 endfunction " }}}
 
 function! phpcd#LocateSymbol(symbol, symbol_context, symbol_namespace, current_imports) " {{{
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
+		return
+	endif
+	let phpid_channel_id = phpcd#GetBufferPhpidChannel()
+	if phpid_channel_id < 0
+		return
+	endif
 	let unknow_location = ['', '', '']
 
 	" are we looking for a method?
@@ -189,12 +204,12 @@ function! phpcd#LocateSymbol(symbol, symbol_context, symbol_namespace, current_i
 
 		" Get location of class definition, we have to iterate through all
 		if classname != ''
-			let [path, line] = rpcrequest(g:phpcd_channel_id, 'location', classname, a:symbol)
+			let [path, line] = rpcrequest(phpcd_channel_id, 'location', classname, a:symbol)
 			return [path, line, 0]
 		endif " }}}
 	elseif a:symbol_context == 'new' || a:symbol_context =~ '\vimplements|extends'" {{{
 		let full_classname = a:symbol_namespace . '\' . a:symbol
-		let [path, line] = rpcrequest(g:phpcd_channel_id, 'location', full_classname, '')
+		let [path, line] = rpcrequest(phpcd_channel_id, 'location', full_classname, '')
 		return [path, line, 0] " }}}
 	elseif a:symbol_context =~ 'function' " {{{
 		" try to find interface method's implementation
@@ -206,12 +221,12 @@ function! phpcd#LocateSymbol(symbol, symbol_context, symbol_namespace, current_i
 		if a:symbol_context =~ '^abstract'
 			let is_interface = 0
 		endif
-		if interface != '' && g:phpid_channel_id >= 0
-			let impls = rpcrequest(g:phpid_channel_id, 'ls', interface, is_interface)
+		if interface != '' && phpid_channel_id >= 0
+			let impls = rpcrequest(phpid_channel_id, 'ls', interface, is_interface)
 			let impl = phpcd#SelectOne(impls)
 
 			if impl != ''
-				let [path, line] = rpcrequest(g:phpcd_channel_id, 'location', impl, a:symbol)
+				let [path, line] = rpcrequest(phpcd_channel_id, 'location', impl, a:symbol)
 				return [path, line, 0]
 			endif
 		endif " }}}
@@ -225,9 +240,9 @@ function! phpcd#LocateSymbol(symbol, symbol_context, symbol_namespace, current_i
 		if a:symbol =~ '\v\C^[A-Z]'
 			let [classname, namespace] = phpcd#ExpandClassName(a:symbol, a:symbol_namespace, a:current_imports)
 			let full_classname = namespace . '\' . classname
-			let [path, line] = rpcrequest(g:phpcd_channel_id, 'location', full_classname)
+			let [path, line] = rpcrequest(phpcd_channel_id, 'location', full_classname)
 		else
-			let [path, line] = rpcrequest(g:phpcd_channel_id, 'location', '', a:symbol)
+			let [path, line] = rpcrequest(phpcd_channel_id, 'location', '', a:symbol)
 		end
 
 		return [path, line, 0]
@@ -449,6 +464,10 @@ function! phpcd#GetCurrentInstruction(line_number, col_number, phpbegin) " {{{
 endfunction " }}}
 
 function! phpcd#GetCallChainReturnType(classname_candidate, class_candidate_namespace, imports, methodstack) " {{{
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
+		return
+	endif
 	" Tries to get the classname and namespace for a chained method call like:
 	"	$this->foo()->bar()->baz()->
 
@@ -476,7 +495,7 @@ function! phpcd#GetCallChainReturnType(classname_candidate, class_candidate_name
 	let method = matchstr(methodstack[0], '\v^\$*\zs[^[(]+\ze')
 	let [classname_candidate, class_candidate_namespace] = phpcd#ExpandClassName(classname_candidate, class_candidate_namespace, a:imports)
 	let full_classname = class_candidate_namespace . '\' . classname_candidate
-	let return_types = rpcrequest(g:phpcd_channel_id, 'functype', full_classname, method)
+	let return_types = rpcrequest(phpcd_channel_id, 'functype', full_classname, method)
 	if len(return_types) > 0
 		let return_type = phpcd#SelectOne(return_types)
 		return phpcd#GetCallChainReturnType(return_type, '', a:imports, methodstack)
@@ -551,6 +570,10 @@ function! phpcd#GetMethodStack(line) " {{{
 endfunction " }}}
 
 function! phpcd#GetClassName(start_line, context, current_namespace, imports) " {{{
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
+		return
+	endif
 	" Get class name
 	" Class name can be detected in few ways:
 	" - @var $myVar class
@@ -644,7 +667,7 @@ function! phpcd#GetClassName(start_line, context, current_namespace, imports) " 
 			return class_candidate_namespace . '\' . classname_candidate
 		endif " }}}
 		let function_name = matchstr(methodstack[0], '^\s*\zs'.function_name_pattern)
-		let return_types = rpcrequest(g:phpcd_channel_id, 'functype', '', function_name)
+		let return_types = rpcrequest(phpcd_channel_id, 'functype', '', function_name)
 		if len(return_types) > 0
 			let return_type = phpcd#SelectOne(return_types)
 			return phpcd#GetCallChainReturnType(return_type, '', class_candidate_imports, methodstack)
@@ -894,22 +917,28 @@ function! phpcd#GetClassName(start_line, context, current_namespace, imports) " 
 endfunction " }}}
 
 function! phpcd#UpdateIndex() " {{{
-	if g:phpid_channel_id < 0
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
+		return
+	endif
+	let phpid_channel_id = phpcd#GetBufferPhpidChannel()
+	if phpid_channel_id < 0
 		return
 	endif
 
 	let g:phpcd_need_update = 0
-	let nsuse = rpcrequest(g:phpcd_channel_id, 'nsuse', expand('%:p'))
+	let nsuse = rpcrequest(phpcd_channel_id, 'nsuse', expand('%:p'))
 	let classname = nsuse.namespace . '\' . nsuse.class
-	return rpcnotify(g:phpid_channel_id, 'update', classname)
+	return rpcnotify(phpid_channel_id, 'update', classname)
 endfunction " }}}
 
 function! phpcd#Reindex() "{{{
-	if g:phpid_channel_id < 0
+	let phpid_channel_id = phpcd#GetBufferPhpidChannel()
+	if phpid_channel_id < 0
 		return
 	endif
 
-	call rpcnotify(g:phpid_channel_id, 'index', 1)
+	call rpcnotify(phpid_channel_id, 'index', 1)
 endfunction " }}}
 
 function! phpcd#GetDocBlock(sccontent, search) " {{{
@@ -1051,7 +1080,12 @@ function! phpcd#GetTypeFromDocBlockParam(docblock_type) " {{{
 endfunction " }}}
 
 function! phpcd#GetCurrentNameSpace() " {{{
-	let nsuse = rpcrequest(g:phpcd_channel_id, 'nsuse', expand('%:p'))
+	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
+	if phpcd_channel_id < 0
+		return
+	endif
+
+	let nsuse = rpcrequest(phpcd_channel_id, 'nsuse', expand('%:p'))
 
 	let imports = {}
 	if len(nsuse.imports) > 0
