@@ -1,7 +1,7 @@
 function! phpcd#CompletePHP(findstart, base) " {{{
 	" we need to wait phpcd {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif " }}}
 
@@ -93,7 +93,7 @@ endfunction " }}}
 
 function! phpcd#CompleteGeneral(base, current_namespace, imports) " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 
@@ -104,7 +104,7 @@ endfunction " }}}
 
 function! phpcd#JumpToDefinition(mode) " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 
@@ -188,11 +188,11 @@ endfunction " }}}
 
 function! phpcd#LocateSymbol(symbol, symbol_context, symbol_namespace, current_imports) " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 	let phpid_channel_id = phpcd#GetBufferPhpidChannel()
-	if phpid_channel_id < 0
+	if phpid_channel_id < 1
 		return
 	endif
 	let unknow_location = ['', '', '']
@@ -465,7 +465,7 @@ endfunction " }}}
 
 function! phpcd#GetCallChainReturnType(classname_candidate, class_candidate_namespace, imports, methodstack) " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 	" Tries to get the classname and namespace for a chained method call like:
@@ -571,7 +571,7 @@ endfunction " }}}
 
 function! phpcd#GetClassName(start_line, context, current_namespace, imports) " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 	" Get class name
@@ -918,11 +918,11 @@ endfunction " }}}
 
 function! phpcd#UpdateIndex() " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 	let phpid_channel_id = phpcd#GetBufferPhpidChannel()
-	if phpid_channel_id < 0
+	if phpid_channel_id < 1
 		return
 	endif
 
@@ -934,7 +934,7 @@ endfunction " }}}
 
 function! phpcd#Reindex() "{{{
 	let phpid_channel_id = phpcd#GetBufferPhpidChannel()
-	if phpid_channel_id < 0
+	if phpid_channel_id < 1
 		return
 	endif
 
@@ -1081,7 +1081,7 @@ endfunction " }}}
 
 function! phpcd#GetCurrentNameSpace() " {{{
 	let phpcd_channel_id = phpcd#GetBufferPhpcdChannel()
-	if phpcd_channel_id < 0
+	if phpcd_channel_id < 1
 		return
 	endif
 
