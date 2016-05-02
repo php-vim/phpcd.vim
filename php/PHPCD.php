@@ -9,7 +9,7 @@ class PHPCD extends RpcServer
     const MATCH_SUBSEQUENCE = 'match_subsequence';
     const MATCH_HEAD        = 'match_head';
 
-    private $matchType;
+    private $matchType = self::MATCH_HEAD;
 
     /**
      * Set type of matching
@@ -34,9 +34,6 @@ class PHPCD extends RpcServer
         LoggerInterface $logger
     ) {
         parent::__construct($root, $unpacker, $logger);
-
-        /** Set default match type **/
-        $this->setMatchType(self::MATCH_SUBSEQUENCE);
     }
 
     /**
