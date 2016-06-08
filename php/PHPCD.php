@@ -6,39 +6,6 @@ use Psr\Log\LoggerInterface;
 
 class PHPCD extends RpcServer
 {
-    const MATCH_SUBSEQUENCE = 'match_subsequence';
-    const MATCH_HEAD        = 'match_head';
-
-    private $matchType;
-
-    /**
-     * Set type of matching
-     *
-     * @param string $matchType
-     * @return null;
-     */
-    public function setMatchType($matchType)
-    {
-        if ($matchType !== self::MATCH_SUBSEQUENCE && $matchType !== self::MATCH_HEAD) {
-            throw new \InvalidArgumentException('Wrong match type');
-        }
-
-        $this->matchType = $matchType;
-
-        return null;
-    }
-
-    public function __construct(
-        $root,
-        \MessagePackUnpacker $unpacker,
-        LoggerInterface $logger
-    ) {
-        parent::__construct($root, $unpacker, $logger);
-
-        /** Set default match type **/
-        $this->setMatchType(self::MATCH_SUBSEQUENCE);
-    }
-
     /**
      *  @param array Map between modifier numbers and displayed symbols
      */
@@ -364,7 +331,7 @@ class PHPCD extends RpcServer
 
             if (false !== $is_static) {
                 foreach ($reflection->getConstants() as $name => $value) {
-                    if (!$pattern || $this->matchPattern($pattern, $name)) {
+                    if (!$pattern || $this->pattern_matcher->match($pattern, $name)) {
                         $items[] = [
                             'word' => $name,
                             'abbr' => sprintf(" +@ %s %s", $name, $value),
@@ -462,7 +429,7 @@ class PHPCD extends RpcServer
     private function getPropertyInfo($property, $pattern)
     {
         $name = $property->getName();
-        if ($pattern && !$this->matchPattern($pattern, $name)) {
+        if ($pattern && !$this->pattern_matcher->match($pattern, $name)) {
             return null;
         }
 
@@ -480,7 +447,7 @@ class PHPCD extends RpcServer
     private function getMethodInfo($method, $pattern = null)
     {
         $name = $method->getName();
-        if ($pattern && !$this->matchPattern($pattern, $name)) {
+        if ($pattern && !$this->pattern_matcher->match($pattern, $name)) {
             return null;
         }
 
@@ -497,31 +464,6 @@ class PHPCD extends RpcServer
             'kind' => 'f',
             'icase' => 1,
         ];
-    }
-
-    /**
-     * @return bool
-     */
-    private function matchPattern($pattern, $fullString)
-    {
-        if (!$pattern) {
-            return true;
-        }
-
-        switch ($this->matchType) {
-            case self::MATCH_SUBSEQUENCE:
-                // @TODO Case sensitivity of matching should be probably configurable
-                // @TODO Quote characters that may be treat not literally
-                $regex = '/'.implode('.*', str_split($pattern)).'/i';
-
-                return (bool)preg_match($regex, $fullString);
-
-            case self::MATCH_HEAD:
-                return (stripos($fullString, $pattern) === 0);
-                break;
-        }
-
-        return false;
     }
 
     /**

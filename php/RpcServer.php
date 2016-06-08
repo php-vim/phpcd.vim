@@ -4,6 +4,7 @@ namespace PHPCD;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerAwareTrait;
+use PHPCD\PatternMatcher\PatternMatcher;
 
 class RpcServer
 {
@@ -27,15 +28,25 @@ class RpcServer
      */
     protected $root;
 
+   /**
+    * @var \MessagePackUnpacker
+    */
     private $unpacker;
+
+    /**
+     * @var PatternMatcher
+     */
+    protected $pattern_matcher;
 
     public function __construct(
         $root,
         \MessagePackUnpacker $unpacker,
+        PatternMatcher $pattern_matcher,
         LoggerInterface $logger
     ) {
         $this->setRoot($root);
         $this->unpacker = $unpacker;
+        $this->pattern_matcher = $pattern_matcher;
         $this->setLogger($logger);
 
         register_shutdown_function([$this, 'shutdown']);
