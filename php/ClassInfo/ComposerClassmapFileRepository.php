@@ -16,8 +16,6 @@ class ComposerClassmapFileRepository implements ClassInfoRepository
 
     private $project_root;
 
-    private $classLoader;
-
     private $classmap = [];
 
     /** @var ClassInfoFactory **/
@@ -35,14 +33,12 @@ class ComposerClassmapFileRepository implements ClassInfoRepository
 
     public function __construct(
         $project_root,
-        ClassLoader $classLoader,
         PatternMatcher $pattern_matcher,
         ClassInfoFactory $classInfoFactory,
         PHPFileInfoFactory $fileInfoFactory,
         LoggerInterface $logger
     ) {
         $this->pattern_matcher = $pattern_matcher;
-        $this->classLoader = $classLoader;
         $this->classInfoFactory = $classInfoFactory;
         $this->fileInfoFactory = $fileInfoFactory;
         $this->setLogger($logger);
@@ -104,13 +100,18 @@ class ComposerClassmapFileRepository implements ClassInfoRepository
      */
     private function isValid($classpath)
     {
-        $filePath = $this->classLoader->findFile($classpath);
+        try {
+            $reflection = new \ReflectionClass($classpath);
+            $file_path = $reflection->getFileName();
+            $file_info = $this->file_infoFactory->createFileInfo($file_path);
+        } catch (\ReflectionException $e) {
+            $this->logger->warning($e->getMessage());
+            return false;
+        }
 
-        $fileInfo = $this->fileInfoFactory->createFileInfo($filePath);
-
-        if ($fileInfo->hasErrors()) {
+        if ($file_info->hasErrors()) {
             $message = 'Class %s did not passed validation and then cannot be added to class info repository. Reason:';
-            $this->logger->warning(sprintf($message, $classpath), $fileInfo->getErrors());
+            $this->logger->warning(sprintf($message, $classpath), $file_info->getErrors());
             return false;
         } else {
             return true;

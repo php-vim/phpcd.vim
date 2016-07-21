@@ -14,7 +14,7 @@ require __DIR__ . '/../vendor/autoload.php';
 /** load autoloader for the project **/
 $composer_autoload_file = $root . '/vendor/autoload.php';
 if (is_readable($composer_autoload_file)) {
-    $class_loader = require $composer_autoload_file;
+    require $composer_autoload_file;
 }
 
 use PHPCD\Factory as F;
@@ -32,7 +32,7 @@ if ($handler_name == 'PHPCD') {
     $handler = new PHPCD\PHPCD($root, $logger,
         $class_info_factory, $phpfile_info_factory);
 } else {
-    $ccfr = new ComposerClassmapFileRepository($root, $class_loader, $matcher,
+    $ccfr = new ComposerClassmapFileRepository($root, $matcher,
         $class_info_factory, $phpfile_info_factory, $logger);
     $handler = new PHPCD\PHPID($root, $logger, $ccfr);
 }
