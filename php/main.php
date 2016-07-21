@@ -1,14 +1,12 @@
 <?php
-error_reporting(0);
+ini_set('display_errors', 'stderr');
 set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 
-$handler_name = $argv[2];
 $root = $argv[1];
-$parameters = (empty($argv[3]) ? '' : $argv[3]);
-$parameters = json_decode($parameters, true) ?: [];
-$parameters['root'] = $root;
+$handler_name = $argv[2];
+$parameters = isset($argv[3]) ? json_decode($argv[3], true) : [];
 
 /** load autoloader for PHPCD **/
 require __DIR__ . '/../vendor/autoload.php';
@@ -19,23 +17,29 @@ if (is_readable($composer_autoload_file)) {
     $class_loader = require $composer_autoload_file;
 }
 
-$parameters['class_loader'] = $class_loader;
+use PHPCD\Factory as F;
+use PHPCD\ClassInfo\ComposerClassmapFileRepository;
 
-$factory = new \PHPCD\Factory;
+$logger = F::createLogger(getenv('HOME').'/.phpcd.log');
+$messenger_type = isset($parameters['messenger']) ? $parameters['messenger'] : null;
+$messenger = F::createIoMessenger($messenger_type);
+$matcher = F::createPatternMatcher();
 
-$configdir = __DIR__.'/../config/';
-$handler_name = strtolower($handler_name);
-$configfile =  $handler_name.'.yml';
-$dIContainer = $factory->createDIContainer($configfile, $configdir, $parameters);
+$class_info_factory = new PHPCD\ClassInfo\ClassInfoFactory($matcher);
+$phpfile_info_factory = new PHPCD\PHPFileInfo\PHPFileInfoFactory();
 
-$logger = $dIContainer->get('default_logger');
+if ($handler_name == 'PHPCD') {
+    $handler = new PHPCD\PHPCD($root, $logger,
+        $class_info_factory, $phpfile_info_factory);
+} else {
+    $ccfr = new ComposerClassmapFileRepository($root, $class_loader, $matcher,
+        $class_info_factory, $phpfile_info_factory, $logger);
+    $handler = new PHPCD\PHPID($root, $logger, $ccfr);
+}
+
+$server = new Lvht\MsgpackRpc\ForkServer($messenger, $handler);
 
 try {
-    if ($handler_name !== 'phpcd' && $handler_name !== 'phpid') {
-        throw new \InvalidArgumentException('The daemon name should be PHPCD or PHPID');
-    }
-
-    $server = $dIContainer->get('server.'. $handler_name);
     $server->loop();
 } catch (\Throwable $e) {
     $logger->error($e->getMessage(), $e->getTrace());
