@@ -2,11 +2,8 @@
 
 namespace PHPCD;
 
-use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\Config\FileLocator;
-use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Lvht\MsgpackRpc\JsonMessenger;
-use Lvht\MsgpackRpc\Io;
+use Lvht\MsgpackRpc\StdIo;
 use Lvht\MsgpackRpc\MsgpackMessenger;
 
 /**
@@ -15,64 +12,23 @@ use Lvht\MsgpackRpc\MsgpackMessenger;
 class Factory
 {
     /**
-     * @return ContainerBuilder
-     */
-    public function createDIContainer($configFileName, $configDir, $additionalParameters = [])
-    {
-        $container = new ContainerBuilder;
-
-        $loader = new YamlFileLoader($container, new FileLocator($configDir));
-
-        $loader->load($configFileName);
-
-        foreach ($additionalParameters as $name => $value) {
-            $container->setParameter($name, $value);
-        }
-
-        $container->compile();
-
-        return $container;
-    }
-
-    /**
-     * @param string $implementation absolute namespace path to a concrete logger
-     * @param array $parameters parameters to logger's constructor
+     * @param string $path the log file path
      * @return \Psr\Log\LoggerInterface
      */
-    public function createLogger($implementation, $parameters = [])
+    public static function createLogger($path, $is_null = false)
     {
-        switch ($implementation) {
-            case '\\PHPCD\\Log\\DateTimeLogger':
-                $decoratedLogger = $this->createLogger('\\PHPCD\\Log\\Logger', $parameters);
-                return new Log\DateTimeLogger($decoratedLogger);
-            break;
-            case '\\PHPCD\\Log\\NullLogger':
-                return new Log\NullLogger;
-            break;
-            case '\\Monolog\\Logger':
-                $path = ((isset($parameters[0]) && is_string($parameters[0])) ? $parameters[0] : getenv('HOME') . '/.phpcd.log');
-
-                $logger = new \Monolog\Logger('PHPCD');
-                $logger->pushHandler(new \Monolog\Handler\StreamHandler($path, \Monolog\Logger::DEBUG));
-                return $logger;
-            break;
-            case '\\PHPCD\\Log\\Logger':
-            default:
-                $path = null;
-
-                if (isset($parameters[0])) {
-                    $path = $parameters[0];
-                }
-
-                return new Log\Logger($path);
-            break;
+        $logger = new \Monolog\Logger('PHPCD');
+        if (!$is_null) {
+            $logger->pushHandler(new \Monolog\Handler\StreamHandler($path, \Monolog\Logger::DEBUG));
         }
+
+        return $logger;
     }
 
     /**
      * @return \PHPCD\PatternMatcher\PatternMatcher
      */
-    public function createPatternMatcher($match_type = 'head', $case_sensitivity = null)
+    public static function createPatternMatcher($match_type = 'head', $case_sensitivity = null)
     {
         $case_sensitivity = (bool)$case_sensitivity;
 
@@ -83,12 +39,13 @@ class Factory
         return new \PHPCD\PatternMatcher\HeadPatternMatcher($case_sensitivity);
     }
 
-    public function createMessenger(IO $io, $messengerType = null)
+    public static function createIoMessenger($type = 'msgpack')
     {
-        if ($messengerType === 'json') {
-            return new JsonMessenger($io);
-        } else {
+        $io = new StdIo();
+        if ($type === 'msgpack') {
             return new MsgpackMessenger($io);
+        } else {
+            return new JsonMessenger($io);
         }
     }
 }

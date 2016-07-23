@@ -4,7 +4,7 @@ namespace PHPCD\ClassInfo;
 
 use PHPCD\PatternMatcher\PatternMatcher;
 
-class ReflectionClass extends \ReflectionClass implements ClassInfo
+class ReflectionClass implements ClassInfo
 {
     /**
      * @var PatternMatcher
@@ -12,19 +12,24 @@ class ReflectionClass extends \ReflectionClass implements ClassInfo
     private $pattern_matcher;
 
     /**
+     * @var \ReflectionClass
+     */
+    private $reflection;
+
+    /**
      * @param string|object $class
      * @param PatternMatcher $pattern_matcher
      */
     public function __construct($class, PatternMatcher $pattern_matcher)
     {
-        parent::__construct($class);
+        $this->reflection = new \ReflectionClass($class);
 
         $this->pattern_matcher = $pattern_matcher;
     }
 
     public function getMatchingConstants($name_pattern)
     {
-        $constants = $this->getConstants();
+        $constants = $this->reflection->getConstants();
 
         foreach (array_keys($constants) as $constant) {
             if ($name_pattern && !$this->pattern_matcher->match($name_pattern, $constant)) {
@@ -45,7 +50,7 @@ class ReflectionClass extends \ReflectionClass implements ClassInfo
      */
     public function getAvailableMethods($static, $public_only = false, $name_pattern = null)
     {
-        $methods = $this->getMethods();
+        $methods = $this->reflection->getMethods();
 
         foreach ($methods as $key => $method) {
             if (false === $this->filterMethod($method, $static, $public_only, $name_pattern)) {
@@ -66,7 +71,7 @@ class ReflectionClass extends \ReflectionClass implements ClassInfo
      */
     public function getAvailableProperties($static, $public_only = false, $name_pattern = null)
     {
-        $properties = $this->getProperties();
+        $properties = $this->reflection->getProperties();
 
         foreach ($properties as $key => $property) {
             if (false === $this->filterMethod($property, $static, $public_only, $name_pattern)) {
@@ -110,12 +115,12 @@ class ReflectionClass extends \ReflectionClass implements ClassInfo
         }
 
         // $element is then private
-        return $element->getDeclaringClass()->getName() === $this->getName();
+        return $element->getDeclaringClass()->getName() === $this->reflection->getName();
     }
 
     public function isAbstractClass()
     {
-        return $this->isAbstract() && $this->isInstantiable();
+        return $this->reflection->isAbstract() && $this->reflection->isInstantiable();
     }
 
     public function matchesFilter(ClassFilter $classFilter)
@@ -124,7 +129,7 @@ class ReflectionClass extends \ReflectionClass implements ClassInfo
 
         foreach ($methods as $method) {
             if ($classFilter->$method() !== null) {
-                if ($classFilter->$method() !== $this->$method()) {
+                if ($classFilter->$method() !== $this->reflection->$method()) {
                     return false;
                 }
             }
