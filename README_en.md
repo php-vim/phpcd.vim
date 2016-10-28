@@ -41,24 +41,28 @@ PHPCD consists of two parts. On part is written in VimL (mainly based on phpcomp
 
 ### Install PHPCD
 
-We recommend you use [Vim-Plug](https://github.com/junegunn/vim-plug/blob/master/README.md) to manage your vim plugins.
+We recommend you use [Vim-Plug](https://github.com/junegunn/vim-plug/blob/master/README.md) to mange your vim plugins.
 
-With Vim-Plug installed, put the following lines in your vimrc:
+With Vim-Plug installed, put the following lines in your vimrc,
 
 ```
-Plug 'phpvim/phpcd.vim', { 'for': 'php' , 'do': 'composer update' }
+Plug 'phpvim/phpcd.vim', { 'for': 'php' , 'do': 'composer update --no-dev' }
+Plug 'vim-scripts/progressbar-widget' " used for showing the index progress
 ```
 
 And then execute `:PlugInstall` in the command mode.
 
 ## Usage
 
-First, in the project directory, run `composer install` to install all the dependent packages and generate the autoload file.
+First, in the project directory, run `composer install --no-dev` to install all the dependent packages and generate the autoload file.
 
 The default PHP command used to run PHP parts of daemon is simply `php`. You may override it by assigning `g:phpcd_php_cli_executable` another value in your `vimrc`, for example:
 ```
 let g:phpcd_php_cli_executable = 'php7.0'
 ```
+
+Use <kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>o</kbd> to complete and use <kbd>ctrl</kbd>+<kbd>]</kbd> to go to the defination.
+
 
 Use <kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>o</kbd> to complete and use <kbd>ctrl</kbd>+<kbd>]</kbd> to go to the defination.
 

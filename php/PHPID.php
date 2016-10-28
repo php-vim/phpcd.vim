@@ -1,33 +1,63 @@
 <?php
+
 namespace PHPCD;
 
 use Psr\Log\LoggerInterface as Logger;
+use Psr\Log\LoggerAwareTrait;
 use Lvht\MsgpackRpc\Server as RpcServer;
 use Lvht\MsgpackRpc\Handler as RpcHandler;
+use PHPCD\Filter\ClassFilter;
+use PHPCD\ClassInfo\ClassInfoRepository;
+use PHPCD\ClassInfo\ClassInfoCollection;
 
 class PHPID implements RpcHandler
 {
+    use LoggerAwareTrait;
+
     /**
      * @var RpcServer
      */
     private $server;
 
-    /**
-     * @var Logger
-     */
-    private $logger;
-
     private $root;
 
-    public function __construct($root, Logger $logger)
+    /**
+     * @var ClassInfoRepository
+     */
+    private $classes_repository;
+
+    public function __construct(
+        $root,
+        Logger $logger,
+        ClassInfoRepository $classes_repository
+    ) {
+        $this->setRoot($root);
+        $this->setLogger($logger);
+        $this->setClassInfoRepository($classes_repository);
+    }
+
+    /**
+     * Set the composer root dir
+     *
+     * @param string $root the path
+     * @return static
+     */
+    private function setRoot($root)
     {
+        // @TODO do we need to validate this input variable?
         $this->root = $root;
-        $this->logger = $logger;
+        return $this;
     }
 
     public function setServer(RpcServer $server)
     {
         $this->server = $server;
+    }
+
+    protected function setClassInfoRepository(ClassInfoRepository $classes_repository)
+    {
+        $this->classes_repository = $classes_repository;
+        return $this;
     }
 
     /**
@@ -89,6 +119,7 @@ class PHPID implements RpcHandler
         $this->initIndexDir();
 
         exec('composer dump-autoload -o -d ' . $this->root . ' 2>&1 >/dev/null');
+
         $this->class_map = require $this->root
             . '/vendor/composer/autoload_classmap.php';
 
@@ -232,5 +263,78 @@ class PHPID implements RpcHandler
     private function vimCloseProgressBar()
     {
         $this->server->call('vim_command', ['call g:pb.restore()']);
+    }
+
+    public function getAbsoluteClassesPaths($path_pattern)
+    {
+        $filter = new ClassFilter([], $path_pattern);
+
+        $collection = $this->classes_repository->find($filter);
+
+        return $this->prepareOutputFromClassInfoCollection($collection, false);
+    }
+
+    public function getInterfaces($path_pattern)
+    {
+        $filter = new ClassFilter([ClassFilter::IS_INTERFACE => true], $path_pattern);
+
+        $collection = $this->classes_repository->find($filter);
+
+        return $this->prepareOutputFromClassInfoCollection($collection, true);
+    }
+
+    public function getPotentialSuperclasses($path_pattern)
+    {
+        $filter = new ClassFilter([
+            ClassFilter::IS_FINAL => false,
+            ClassFilter::IS_TRAIT => false,
+            ClassFilter::IS_INTERFACE => false
+        ], $path_pattern);
+
+        $collection = $this->classes_repository->find($filter);
+
+        return $this->prepareOutputFromClassInfoCollection($collection, true);
+    }
+
+    public function getInstantiableClasses($path_pattern)
+    {
+        $filter = new ClassFilter([ClassFilter::IS_INSTANTIABLE => true], $path_pattern);
+
+        $collection = $this->classes_repository->find($filter);
+
+        return $this->prepareOutputFromClassInfoCollection($collection, true);
+    }
+
+    public function getNamesToTypeDeclaration($path_pattern)
+    {
+        // @TODO add basic type here, not in repository
+        $filter = new ClassFilter([ClassFilter::IS_TRAIT => false], $path_pattern);
+
+        $collection = $this->classes_repository->find($filter);
+
+        return $this->prepareOutputFromClassInfoCollection($collection, true);
+    }
+
+    /**
+     * Prepare single element of completion output
+     * @param ClassInfo $class_info
+     * @param bool $leading_backslash prepend class path with backslash
+     * @return array
+     */
+    private function prepareOutputFromClassInfoCollection(
+        ClassInfoCollection $collection,
+        $leading_backslash = true
+    ) {
+        $result = [];
+
+        foreach ($collection as $class_info) {
+            $result[] = [
+                'full_name' => ($leading_backslash ? '\\' : '') . $class_info->getName(),
+                'short_name' => $class_info->getShortName(),
+                'doc_comment' => $class_info->getDocComment()
+            ];
+        }
+
+        return $result;
     }
 }

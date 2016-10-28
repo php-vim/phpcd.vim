@@ -9,7 +9,6 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 		" locate the start of the word
 		let line = getline('.')
 		let start = col('.') - 1
-		let compl_begin = col('.') - 2
 		while start >= 0 && line[start - 1] =~ '[\\a-zA-Z_0-9\x7f-\xff$]'
 			let start -= 1
 		endwhile
@@ -48,14 +47,15 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 			return phpcd#GetPsrNamespace()
 		endif
 
-		if context =~? '\v^(abstract\s+)?(class|interface|trait)'
+		if context =~? '\v^(final|abstract\s+)?(class|interface|trait)$'
 			return [expand('%:t:r')]
 		end
 
 		let [current_namespace, imports] = phpcd#GetCurrentNameSpace()
 
+		" TODO distinguish import of trait inside a class
 		if context =~? '^use\s' || context ==? 'use' " {{{
-			" TODO complete use
+			return phpcd#getAbsoluteClassesPaths(a:base)
 		endif " }}}
 
 		if context =~ '\(->\|::\)$' " {{{
@@ -76,17 +76,18 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 
 			return rpc#request(g:phpcd_channel_id, 'info', classname, a:base, is_static, public_only)
 		elseif context =~? 'implements'
-			" TODO complete class Foo implements
+			return phpcd#getInterfaces(a:base)
 		elseif context =~? 'extends\s\+.\+$' && a:base == ''
-			" TODO complete class Foo extends
-		elseif context =~? 'extends'
-			" TODO complete class Foo extends Prefix..
+		elseif context =~? 'extends\s\+.\+$'
+			return phpcd#getPotentialSuperclasses(a:base)
+		elseif context =~? 'extends$'
+			return phpcd#getPotentialSuperclasses(a:base)
 		elseif context =~? 'class [a-zA-Z_\x7f-\xff\\][a-zA-Z_0-9\x7f-\xff\\]*'
 			" special case when you've typed the class keyword and the name too,
 			" only extends and implements allowed there
 			return filter(['extends', 'implements'], 'stridx(v:val, a:base) == 0')
-		elseif context =~? 'new'
-			" TODO complete $foo = new
+		elseif context =~? 'new$'
+			return phpcd#getInstantiableClasses(a:base)
 		endif " }}}
 
 		if a:base =~ '^[^$]' " {{{
@@ -101,12 +102,213 @@ function! phpcd#GetPsrNamespace() " {{{
 	return rpc#request(g:phpcd_channel_id, 'psr4ns', expand('%:p'))
 endfunction " }}}
 
+function! s:remapClassInfoItem(class_item, make_use_entry) " {{{
+	let result = {}
+	let result.menu = a:class_item.short_name
+
+	if a:make_use_entry == 1
+		let result.word = a:class_item.short_name
+		let result.abbr = a:class_item.full_name
+	else
+		let result.word = a:class_item.full_name
+	endif
+
+	" It is a fix of buggy behaviour:
+	" when the currently highlighted item has no info
+	" then the preview window displayed info of the previously highlighted one.
+	" This effect still remains after we hit back
+	" to the item with no completion
+	let result.info = empty(a:class_item.doc_comment) ? 'No doc comment' : a:class_item.doc_comment
+
+	let result.kind = 'c'
+
+	return result
+endfunction " }}}
+
+function! s:prepareClassInfoOutput(response, make_use_entry) " {{{
+	let result = []
+
+	for class_item in a:response
+		call add(result, s:remapClassInfoItem(class_item, a:make_use_entry))
+	endfor
+
+	return result
+endfunction  " }}}
+
+function! phpcd#getPotentialSuperclasses(path) " {{{
+	let class_info = rpc#request(g:phpid_channel_id, 'getPotentialSuperclasses', a:path)
+	return <SID>prepareClassInfoOutput(class_info, g:phpcd_insert_class_shortname)
+endfunction " }}}
+
+function! phpcd#getInterfaces(path) " {{{
+	let class_info = rpc#request(g:phpid_channel_id, 'getInterfaces', a:path)
+	return <SID>prepareClassInfoOutput(class_info, g:phpcd_insert_class_shortname)
+endfunction " }}}
+
+function! phpcd#getInstantiableClasses(path) " {{{
+	let class_info = rpc#request(g:phpid_channel_id, 'getInstantiableClasses', a:path)
+	return <SID>prepareClassInfoOutput(class_info, g:phpcd_insert_class_shortname)
+endfunction " }}}
+
+function! phpcd#getAbsoluteClassesPaths(path) " {{{
+	let class_info = rpc#request(g:phpid_channel_id, 'getAbsoluteClassesPaths', a:path)
+	return <SID>prepareClassInfoOutput(class_info, 0)
+endfunction " }}}
+
 function! phpcd#CompleteGeneral(base, current_namespace, imports) " {{{
 	let base = substitute(a:base, '^\\', '', '')
 	let [pattern, namespace] = phpcd#ExpandClassName(a:base, a:current_namespace, a:imports)
 	return rpc#request(g:phpcd_channel_id, 'info', '', pattern)
 endfunction " }}}
 
+function! phpcd#completeDone() " {{{
+	if empty(v:completed_item)
+		return
+	endif
+
+	let current_line = getline('.')
+	if v:completed_item.kind == 'c'
+		" if inserted string is not an absolute path
+		if stridx(v:completed_item.word, '\') != 0
+			let new_alias = v:completed_item.word
+			let new_full_path = v:completed_item.abbr
+
+			" if not in line with "use" and not within class definition (case when use trait)
+			" TODO check if the cursor is inside a class
+			" inside_class || not "use"
+			if current_line !~ '^\s*use\s\+'
+				let fixes = phpcd#getFixForNewClassUsage(new_alias, new_full_path)
+
+				if !empty(fixes)
+					let fix = phpcd#getSelectedItem(fixes)
+				endif
+
+				if (fix.alias != v:null)
+					if (fix.full_path != v:null)
+						" v:completed_item.word is intentionally used there
+						" as new_alias may be changed
+						let prompt = 'Confirm the new alias lub enter any custom: '
+						let fix.alias = phpcd#promptForChangeString(prompt, fix.alias)
+
+						" todo fix.alias is not any from
+
+						" TODO write loop 'phpcd#promptForChangeString; call phpcd#getFixForNewClassUsage'
+						" to check if the new alias is valid and has no conflicts
+					endif
+					"
+					" Assume we know that the changed alias is valid.
+					" We may replace v:completed_item.word with it
+					call phpcd#replaceCurrentWordAfterCompletion(v:completed_item.word, fix.alias)
+				endif
+
+				if (fix.full_path != v:null)
+					call phpcd#putImport(fix.full_path, fix.alias, 0)
+				endif
+			endif
+		endif
+	endif
+endfunction " }}}
+
+function phpcd#getFixForNewClassUsage(new_alias, new_full_path) "{{{
+	 return rpc#request(g:phpcd_channel_id, 'getFixForNewClassUsage', expand('%:p'), { 'alias': a:new_alias, 'full_path': a:new_full_path })
+endfunction "}}}
+
+" TODO make it private after test
+function! phpcd#getSelectedItem(list) "{{{
+	let list = a:list
+
+	if empty(list)
+		return {}
+	endif
+
+	if len(list) == 1
+		return list[0]
+	endif
+
+	let prompt = printf("%s: ", 'Select path')
+	return <SID>promptByInputList(list, prompt)
+endfunction "}}}
+
+" Select implementation of input list
+function s:promptByInputList(list, msg) "{{{
+	if exists('g:loaded_tlib')
+		return <SID>promptByTlibInputList(a:list, a:msg)
+	else
+		return <SID>promptByBuiltinInputList(a:list, a:msg)
+	endif
+endfunction "}}}
+
+function s:promptByTlibInputList(list, msg) "{{{
+	let list = map(copy(a:list), '(empty(v:val["alias"]) ? "" : v:val["alias"]) . (empty(v:val["full_path"]) ? "" : " ".v:val["full_path"])')
+
+	let item = tlib#input#List('si', a:msg, list)
+
+	return a:list[item - 1]
+endfunction "}}}
+
+function s:promptByBuiltinInputList(list, msg) "{{{
+	let list = map(copy(a:list), '(v:key + 1) . ": " . (empty(v:val["alias"]) ? "" : v:val["alias"]) . (empty(v:val["full_path"]) ? "" : " ".v:val["full_path"])')
+	let list = insert(list, a:msg)
+	let item = 0
+
+	while (item <= 0 || item > len(a:list))
+		let item = inputlist(list)
+	endwhile
+
+	return a:list[item - 1]
+endfunction "}}}
+
+function s:makeImportLineText(classpath, alias) "{{{
+	if empty(a:alias)
+		let line = printf('use %s;', a:classpath)
+	else
+		let line = printf('use %s as %s;', a:classpath, a:alias)
+	endif
+
+	return line
+endfunction "}}}
+
+" TODO make it private after test
+function phpcd#putImport(classpath, alias, stay_here) "{{{
+
+	if phpcd#goToLineForNewUseStatement(a:stay_here) == 0
+		exec 'normal! cc'.<SID>makeImportLineText(a:classpath, a:alias)
+	endif
+endfunction "}}}
+
+function! phpcd#goToLineForNewUseStatement(stay_here) "{{{
+	if a:stay_here == 1
+		return 0
+	endif
+
+	if searchdecl('use', 1) == 0
+		" cursor is at an existing use statement
+		exec 'normal! O'
+
+		return 0
+	else
+		" cursor somewhere else, try to search namespace declaration
+		if searchdecl('namespace', 1) == 0
+			exec 'normal 2o'
+
+			return 0
+		endif
+	endif
+
+	return 1
+endfunction "}}}
+
+function phpcd#promptForChangeString(msg, string) "{{{
+	let string = inputdialog(a:msg, a:string)
+	return string
+endfunction "}}}
+
+" TODO make it private after test
+" TODO better implementation are welcome - the current assumes that the cursor
+" stays at the end of inserted word
+function! phpcd#replaceCurrentWordAfterCompletion(current_word, new_word) "{{{
+	exec 'normal! hv'. (len(a:current_word) - 1) .'hc'. a:new_word
+endfunction "}}}
 function! phpcd#JumpToDefinition(mode) " {{{
 	if !exists('g:phpcd_channel_id')
 		return

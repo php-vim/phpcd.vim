@@ -43,13 +43,13 @@ PHPCD 的 VimL 部分基于[phpcomplete.vim](https://github.com/shawncplus/phpco
 安装 Vim-Plug 后，添加：
 
 ```
-Plug 'phpvim/phpcd.vim', { 'for': 'php' , 'do': 'composer update' }
+Plug 'phpvim/phpcd.vim', { 'for': 'php' , 'do': 'composer update --no-dev' }
 ```
 
 然后执行`:PlugInstall`进行安装。
 
 ## 使用方法
 
-首先运行 `composer install` 更新依赖并生成自动加载文件，然后打开 NeoVim。
+首先运行 `composer install --no-dev` 更新依赖并生成自动加载文件，然后打开 NeoVim。
 
 补全按<kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>o</kbd>，跳转按<kbd>ctrl</kbd>+<kbd>]</kbd>。

@@ -4,49 +4,40 @@ set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 
-$root   = $argv[1];
-$daemon = $argv[2];
-$messenger = $argv[3];
-$autoload_file = $argv[4];
+$handler_name = $argv[2];
+$root = $argv[1];
+$parameters = (empty($argv[3]) ? '' : $argv[3]);
+$parameters = json_decode($parameters, true) ?: [];
+$parameters['root'] = $root;
 
 /** load autoloader for PHPCD **/
 require __DIR__ . '/../vendor/autoload.php';
 
-use Monolog\Logger;
-use Monolog\Handler\StreamHandler;
-use Lvht\MsgpackRpc\ForkServer;
-use Lvht\MsgpackRpc\MsgpackMessenger;
-use Lvht\MsgpackRpc\JsonMessenger;
-use Lvht\MsgpackRpc\StdIo;
-
-$log_path = getenv('HOME') . '/.phpcd.log';
-$logger = new Logger('PHPCD');
-$logger->pushHandler(new StreamHandler($log_path, Logger::DEBUG));
-if ($messenger == 'json') {
-    $messenger = new JsonMessenger(new StdIo());
-} else {
-    $messenger = new MsgpackMessenger(new StdIo());
+/** load autoloader for the project **/
+$composer_autoload_file = $root . '/vendor/autoload.php';
+$autoload_file = empty($parameters['autoload_file']) ? $composer_autoload_file : $parameters['autoload_file'];
+if (is_readable($autoload_file)) {
+    $class_loader = require $autoload_file;
+    // @TODO non-composer class loader
 }
 
+$parameters['class_loader'] = $class_loader;
+
+$factory = new \PHPCD\Factory;
+
+$configdir = __DIR__.'/../config/';
+$handler_name = strtolower($handler_name);
+$configfile =  $handler_name.'.yml';
+$dIContainer = $factory->createDIContainer($configfile, $configdir, $parameters);
+
+$logger = $dIContainer->get('default_logger');
+
 try {
-    /** load autoloader for the project **/
-    if (is_readable($autoload_file)) {
-        require $autoload_file;
+    if ($handler_name !== 'phpcd' && $handler_name !== 'phpid') {
+        throw new \InvalidArgumentException('The daemon name should be PHPCD or PHPID');
     }
 
-    switch ($daemon) {
-        case 'PHPCD':
-            $handler = new PHPCD\PHPCD($root, $logger);
-            break;
-        case 'PHPID':
-            $handler = new PHPCD\PHPID($root, $logger);
-            break;
-        default:
-            throw new \InvalidArgumentException('The second parameter should be PHPCD or PHPID');
-    }
-
-    $server = new ForkServer($messenger, $handler);
-
+    $server = $dIContainer->get('server.'. $handler_name);
     $server->loop();
 } catch (\Throwable $e) {
     $logger->error($e->getMessage(), $e->getTrace());

@@ -2,20 +2,15 @@
 namespace PHPCD;
 
 use Psr\Log\LoggerInterface as Logger;
+use Psr\Log\LoggerAwareTrait;
 use Lvht\MsgpackRpc\Server as RpcServer;
 use Lvht\MsgpackRpc\Handler as RpcHandler;
+use PHPCD\PHPFileInfo\PHPFileInfoFactory;
+use PHPCD\ClassInfo\ClassInfoFactory;
 
 class PHPCD implements RpcHandler
 {
-    const MATCH_SUBSEQUENCE = 'match_subsequence';
-    const MATCH_HEAD        = 'match_head';
-
-    private $matchType;
-
-    /**
-     * @var Logger
-     */
-    private $logger;
+    use LoggerAwareTrait;
 
     /**
      * @var RpcServer
@@ -24,29 +19,44 @@ class PHPCD implements RpcHandler
 
     private $root;
 
-    public function __construct($root, Logger $logger, $match_type = self::MATCH_HEAD)
+    /*
+     * Probably it should be replaced by
+     * correctly implemented repository
+     * to avoid scanning each file each time
+     * even if such was not changed in meantime.
+     *
+     * @var PHPFileInfoFactory
+     */
+    private $file_info_factory;
+
+    public function __construct(
+        $root,
+        Logger $logger,
+        ClassInfoFactory $class_info_factory,
+        PHPFileInfoFactory $file_info_factory
+    ) {
+        $this->setRoot($root);
+        $this->setLogger($logger);
+        $this->class_info_factory = $class_info_factory;
+        $this->file_info_factory = $file_info_factory;
+    }
+
+    /**
+     * Set the composer root dir
+     *
+     * @param string $root the path
+     * @return static
+     */
+    private function setRoot($root)
     {
-        $this->logger = $logger;
+        // @TODO do we need to validate this input variable?
         $this->root = $root;
+        return $this;
     }
 
     public function setServer(RpcServer $server)
     {
         $this->server = $server;
-    }
-
-    /**
-     * Set type of matching
-     *
-     * @param string $matchType
-     */
-    public function setMatchType($matchType)
-    {
-        if ($matchType !== self::MATCH_SUBSEQUENCE && $matchType !== self::MATCH_HEAD) {
-            throw new \InvalidArgumentException('Wrong match type');
-        }
-
-        $this->matchType = $matchType;
     }
 
     /**
@@ -93,7 +103,7 @@ class PHPCD implements RpcHandler
     {
         if ($class_name) {
             $static_mode = $this->translateStaticMode($static_mode);
-            return $this->classInfo($class_name, $pattern, $static_mode, $public_only);
+            return $this->getMatchingClassDetails($class_name, $pattern, $static_mode, $public_only);
         }
 
         if ($pattern) {
@@ -210,10 +220,12 @@ class PHPCD implements RpcHandler
     /**
      * Fetch the php script's namespace and imports(by use) list.
      *
-     * @param string $path the php scrpit path
+     * @param string $path the php script path
+     * @param string $specific_alias in not empty, do not get information about other aliases
      *
      * @return [
      *   'namespace' => 'ns',
+     *   'class' => 'shortname'
      *   'imports' => [
      *     'alias1' => 'fqdn1',
      *   ]
@@ -221,70 +233,12 @@ class PHPCD implements RpcHandler
      */
     public function nsuse($path)
     {
-        $use_pattern =
-            '/^use\s+((?<type>(constant|function)) )?(?<left>[\\\\\w]+\\\\)?({)?(?<right>[\\\\,\w\s]+)(})?\s*;$/';
-        $alias_pattern = '/(?<suffix>[\\\\\w]+)(\s+as\s+(?<alias>\w+))?/';
-        $class_pattern = '/^\s*\b((((final|abstract)\s+)?class)|interface|trait)\s+(?<class>\S+)/i';
-
-        $file = new \SplFileObject($path);
-        $s = [
-            'namespace' => '',
-            'imports' => [
-                '@' => '',
-                // empty array will be enoded to "[]" by json
-                // so when there is no import we need convert
-                // the empty array into stdobj
-                // which will be encoded to "{}" by json
-                // however the msgpack used by neovim does not allowed dictionary
-                // with empty key. so we have no choice but fill import some
-                // value to ensure none empty.
-            ],
-            'class' => '',
+        $file_info = $this->file_info_factory->createFileInfo($path);
+        return [
+            'namespace' => $file_info->getNamespace(),
+            'class' => $file_info->getClass(),
+            'imports' => $file_info->getImports()
         ];
-
-        foreach ($file as $line) {
-            if (preg_match($class_pattern, $line, $matches)) {
-                $s['class'] = $matches['class'];
-                break;
-            }
-            $line = trim($line);
-            if (!$line) {
-                continue;
-            }
-            if (preg_match('/(<\?php)?\s*namespace\s+(.*);$/', $line, $matches)) {
-                $s['namespace'] = $matches[2];
-            } elseif (strtolower(substr($line, 0, 3) == 'use')) {
-                if (preg_match($use_pattern, $line, $use_matches) && !empty($use_matches)) {
-                    $expansions = array_map('self::trim', explode(',', $use_matches['right']));
-
-                    foreach ($expansions as $expansion) {
-                        if (preg_match($alias_pattern, $expansion, $expansion_matches) && !empty($expansion_matches)) {
-                            $suffix = $expansion_matches['suffix'];
-
-                            if (empty($expansion_matches['alias'])) {
-                                $suffix_parts = explode('\\', $suffix);
-                                $alias = array_pop($suffix_parts);
-                            } else {
-                                $alias = $expansion_matches['alias'];
-                            }
-                        }
-
-                        /** empty type means import of some class **/
-                        if (empty($use_matches['type'])) {
-                            $s['imports'][$alias] = $use_matches['left'] . $suffix;
-                        }
-                        // @todo case when $use_matches['type'] is 'constant' or 'function'
-                    }
-                }
-            }
-        }
-
-        return $s;
-    }
-
-    private static function trim($str)
-    {
-        return trim($str, "\t\n\r\0\x0B\\ ");
     }
 
     /**
@@ -399,41 +353,33 @@ class PHPCD implements RpcHandler
         'void'     => 1,
     ];
 
-    private function classInfo($class_name, $pattern, $is_static, $public_only)
+    private function getMatchingClassDetails($class_name, $pattern, $is_static, $public_only)
     {
         try {
-            $reflection = new \PHPCD\Reflection\ReflectionClass($class_name);
+            $reflection = $this->class_info_factory->createClassInfo($class_name);
             $items = [];
 
             if (false !== $is_static) {
-                foreach ($reflection->getConstants() as $name => $value) {
-                    if (!$pattern || $this->matchPattern($pattern, $name)) {
+                foreach ($reflection->getMatchingConstants($pattern) as $name => $value) {
                         $items[] = [
                             'word' => $name,
                             'abbr' => sprintf(" +@ %s %s", $name, $value),
                             'kind' => 'd',
                             'icase' => 1,
                         ];
-                    }
                 }
             }
 
-            $methods = $reflection->getAvailableMethods($is_static, $public_only);
+            $methods = $reflection->getAvailableMethods($is_static, $public_only, $pattern);
 
             foreach ($methods as $method) {
-                $info = $this->getMethodInfo($method, $pattern);
-                if ($info) {
-                    $items[] = $info;
-                }
+                $items[] = $this->getMethodInfo($method, $pattern);
             }
 
-            $properties = $reflection->getAvailableProperties($is_static, $public_only);
+            $properties = $reflection->getAvailableProperties($is_static, $public_only, $pattern);
 
             foreach ($properties as $property) {
-                $info = $this->getPropertyInfo($property, $pattern);
-                if ($info) {
-                    $items[] = $info;
-                }
+                $items[] = $this->getPropertyInfo($property);
             }
 
             return $items;
@@ -441,6 +387,13 @@ class PHPCD implements RpcHandler
             $this->logger->debug($e->getMessage());
             return [null, []];
         }
+    }
+
+    public function getFixForNewClassUsage($path, array $new_class_params)
+    {
+        $info = $this->file_info_factory->createFileInfo($path);
+
+        return $info->getFixForNewClassUsage($new_class_params);
     }
 
     private function functionOrConstantInfo($pattern)
@@ -502,12 +455,9 @@ class PHPCD implements RpcHandler
         ];
     }
 
-    private function getPropertyInfo($property, $pattern)
+    private function getPropertyInfo($property)
     {
         $name = $property->getName();
-        if ($pattern && !$this->matchPattern($pattern, $name)) {
-            return null;
-        }
 
         $modifier = $this->getModifiers($property);
         if ($property->getModifiers() & \ReflectionMethod::IS_STATIC) {
@@ -523,12 +473,9 @@ class PHPCD implements RpcHandler
         ];
     }
 
-    private function getMethodInfo($method, $pattern = null)
+    private function getMethodInfo($method)
     {
         $name = $method->getName();
-        if ($pattern && !$this->matchPattern($pattern, $name)) {
-            return null;
-        }
 
         $params = array_map(function ($param) {
             return $param->getName();
@@ -543,31 +490,6 @@ class PHPCD implements RpcHandler
             'kind' => 'f',
             'icase' => 1,
         ];
-    }
-
-    /**
-     * @return bool
-     */
-    private function matchPattern($pattern, $fullString)
-    {
-        if (!$pattern) {
-            return true;
-        }
-
-        switch ($this->matchType) {
-            case self::MATCH_SUBSEQUENCE:
-                // @TODO Case sensitivity of matching should be probably configurable
-                $modifiers = 'i';
-                $regex = sprintf('/%s/%s', implode('.*', array_map('preg_quote', str_split($pattern))), $modifiers);
-
-                return (bool)preg_match($regex, $fullString);
-
-            case self::MATCH_HEAD:
-                return (stripos($fullString, $pattern) === 0);
-                break;
-        }
-
-        return false;
     }
 
     /**
@@ -612,18 +534,18 @@ class PHPCD implements RpcHandler
         $composer = json_decode(file_get_contents($composer_path), true);
 
         if (isset($composer['autoload']['psr-4'])) {
-            $list = (array) $composer['autoload']['psr-4'];
+            $list = $composer['autoload']['psr-4'];
         } else {
             $list = [];
         }
 
         if (isset($composer['autoload-dev']['psr-4'])) {
-            $dev_list = (array) $composer['autoload-dev']['psr-4'];
+            $list_dev = $composer['autoload']['psr-4'];
         } else {
-            $dev_list = [];
+            $list_dev = [];
         }
 
-        foreach ($dev_list as $namespace => $paths) {
+        foreach ($list_dev as $namespace => $paths) {
             if (isset($list[$namespace])) {
                 $list[$namespace] = array_merge((array)$list[$namespace], (array) $paths);
             } else {
