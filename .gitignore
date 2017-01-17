@@ -2,3 +2,6 @@
 .phpcd/
 /vimunit
 composer.lock
+
+# Ignore deoplete source cache
+*.py[cod]
