@@ -15,8 +15,8 @@ class Source(Base):
 
     def get_complete_position(self, context):
         return self.vim.call('phpcd#CompletePHP',
-                             1, '', 0)
+                             1, '')
 
     def gather_candidates(self, context):
         return self.vim.call('phpcd#CompletePHP',
-                             0, context['complete_str'], 0)
+                             0, context['complete_str'])
