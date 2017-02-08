@@ -227,6 +227,11 @@ class PHPCD implements RpcHandler
 
         $doc = $reflection->getDocComment();
 
+        if ($is_method && preg_match('/@inheritDoc/', $doc)) {
+            $reflection = $this->getReflectionFromInheritDoc($reflection_class, $name);
+            $doc = $reflection->getDocComment();
+        }
+
         if (preg_match('/@(return|var)\s+static/i', $doc)) {
             $path = $reflection_class->getFileName();
         } else {
@@ -234,6 +239,38 @@ class PHPCD implements RpcHandler
         }
 
         return [$path, $this->clearDoc($doc)];
+    }
+
+    /**
+     * Get the origin method reflection the inherited docComment belongs to.
+     *
+     * @param $reflection_class \ReflectionClass
+     * @param $name string
+     *
+     * @return \ReflectionClass
+     */
+    private function getReflectionFromInheritDoc($reflection_class, $method_name)
+    {
+        $interfaces = $reflection_class->getInterfaces();
+
+        foreach ($interfaces as $interface) {
+            if ($interface->hasMethod($method_name)) {
+                return $interface->getMethod($method_name);
+            }
+        }
+
+        $reflection_method = $reflection_class->getMethod($method_name);
+        $parent_class = $reflection_class->getParentClass();
+
+        if ($parent_class) {
+            $reflection_method = $parent_class->getMethod($method_name);
+            $doc = $reflection_method->getDocComment();
+            if (preg_match('/@inheritDoc/', $doc)) {
+                $reflection_method = $this->getInheritDoc($parent_class, $method_name);
+            }
+        }
+
+        return $reflection_method;
     }
 
     /**
