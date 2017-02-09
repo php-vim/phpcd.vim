@@ -539,7 +539,7 @@ class PHPCD implements RpcHandler
             return $items;
         } catch (\ReflectionException $e) {
             $this->logger->debug($e->getMessage());
-            return [null, []];
+            return [];
         }
     }
 
