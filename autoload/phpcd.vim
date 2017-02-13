@@ -903,8 +903,10 @@ function! phpcd#GetClassName(start_line, context, current_namespace, imports) " 
 			if line =~? '^\s*' . object . '\s*=.*);\?$' " {{{
 				let classname = phpcd#GetCallChainReturnTypeAt(a:start_line - i)
 				let classname_parts = split(classname, '\\\+')
-				let classname_candidate = classname_parts[-1]
-				let class_candidate_namespace = join(classname_parts[0:-2], '\')
+				if len(classname_parts) > 0
+					let classname_candidate = classname_parts[-1]
+					let class_candidate_namespace = join(classname_parts[0:-2], '\')
+				endif
 				break
 			endif " }}}
 
