@@ -211,17 +211,22 @@ class PHPCD implements RpcHandler
         $reflection_class = new \ReflectionClass($class_name);
 
         if ($is_method) {
-            $reflection = $reflection_class->getMethod($name);
+            if ($reflection_class->hasMethod($name)) {
+                $reflection = $reflection_class->getMethod($name);
+            } else {
+                $class_doc = $this->getAllClassDocComments($reflection_class);
+                $pattern = '/@method\s+(?<type>\S+)\s+?'.$name.'/mi';
+
+                return $this->matchPatternToDoc($pattern, $class_doc);
+            }
         } else {
             if ($reflection_class->hasProperty($name)) {
                 $reflection = $reflection_class->getProperty($name);
             } else {
-                $class_doc = $reflection_class->getDocComment();
+                $class_doc = $this->getAllClassDocComments($reflection_class);
+                $pattern = '/@property(|-read|-write)\s+(?<type>\S+)\s+\$?'.$name.'/mi';
 
-                $has_pseudo_property = preg_match('/@property(|-read|-write)\s+(?<type>\S+)\s+\$?'.$name.'/mi', $class_doc, $matches);
-                if ($has_pseudo_property) {
-                    return [$reflection_class->getFileName(), '@var '.$matches['type']];
-                }
+                return $this->matchPatternToDoc($pattern, $class_doc);
             }
         }
 
@@ -239,6 +244,27 @@ class PHPCD implements RpcHandler
         }
 
         return [$path, $this->clearDoc($doc)];
+    }
+
+    /**
+     * Matches the give pattern to the DocComments provided
+     * Expects $docs to be an array with the file name as key
+     *
+     * @param string $pattern
+     * @param array $docs
+     *
+     * @return array
+     */
+    private function matchPatternToDoc($pattern, $docs)
+    {
+        foreach ($docs as $file => $doc) {
+            $has_pseudo_method = preg_match($pattern, $doc, $matches);
+            if ($has_pseudo_method) {
+                return [$file, '@var '.$matches['type']];
+            }
+        }
+
+        return ['', ''];
     }
 
     /**
@@ -532,8 +558,10 @@ class PHPCD implements RpcHandler
                 }
             }
 
-            $pseudo_items = $this->getPseudoProperties($reflection);
+            $pseudo_items = $this->getPseudoMethods($reflection);
+            $items = array_merge($items, $pseudo_items);
 
+            $pseudo_items = $this->getPseudoProperties($reflection);
             $items = array_merge($items, $pseudo_items);
 
             return $items;
@@ -542,11 +570,36 @@ class PHPCD implements RpcHandler
             return [];
         }
     }
+    /**
+     * Get class DocComment methods, from parents as well
+     *
+     * @param \ReflectionClass
+     *
+     * @return string
+     *
+     * @author yourname
+     */
+    private function getAllClassDocComments(\ReflectionClass $reflection)
+    {
+        $doc = [];
+        do {
+            $file_name = $reflection->getFileName();
+            $doc[$file_name] = $reflection->getDocComment();
+            $reflection = $reflection->getParentClass();
+        } while ($reflection); // gets the parents properties too
+
+        return $doc;
+    }
 
     public function getPseudoProperties(\ReflectionClass $reflection)
     {
-        $doc = $reflection->getDocComment();
-        $has_doc = preg_match_all('/@property(|-read|-write)\s+(?<types>\S+)\s+\$?(?<names>[a-zA-Z0-9_$]+)/mi', $doc, $matches);
+        $doc = $this->getAllClassDocComments($reflection);
+        $all_docs = '';
+        foreach ($doc as $class_doc) {
+            $all_docs .= $class_doc;
+        }
+
+        $has_doc = preg_match_all('/@property(|-read|-write)\s+(?<types>\S+)\s+\$?(?<names>[a-zA-Z0-9_$]+)/mi', $all_docs, $matches);
         if (!$has_doc) {
             return [];
         }
@@ -558,6 +611,34 @@ class PHPCD implements RpcHandler
                 'abbr' => sprintf('%3s %s', '+', $name),
                 'info' => $matches['types'][$idx],
                 'kind' => 'p',
+                'icase' => 1,
+            ];
+        }
+
+        return $items;
+    }
+
+    public function getPseudoMethods(\ReflectionClass $reflection)
+    {
+        $doc = $this->getAllClassDocComments($reflection);
+        $all_docs = '';
+        foreach ($doc as $class_doc) {
+            $all_docs .= $class_doc;
+        }
+
+        $has_doc = preg_match_all('/@method\s+(?<types>\S+)\s+(?<names>[a-zA-Z0-9_$]+)\((?<params>.*)\)/mi', $all_docs, $matches);
+        if (!$has_doc) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($matches['names'] as $idx => $name) {
+            preg_match_all('/\$[a-zA-Z0-9_]+/mi', $matches['params'][$idx], $params);
+            $items[] = [
+                'word' => $name,
+                'abbr' => sprintf("%3s %s (%s)", '+', $name, join(', ', end($params))),
+                'info' => $matches['types'][$idx],
+                'kind' => 'f',
                 'icase' => 1,
             ];
         }
