@@ -209,6 +209,7 @@ class PHPCD implements RpcHandler
     private function docClass($class_name, $name, $is_method)
     {
         $reflection_class = new \ReflectionClass($class_name);
+        $reflection = null;
 
         if ($is_method) {
             $reflection = $reflection_class->getMethod($name);
@@ -223,6 +224,10 @@ class PHPCD implements RpcHandler
                     return [$reflection_class->getFileName(), '@var '.$matches['type']];
                 }
             }
+        }
+
+        if (!$reflection) {
+            return ['', ''];
         }
 
         $doc = $reflection->getDocComment();
