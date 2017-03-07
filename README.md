@@ -60,6 +60,13 @@ let g:deoplete#ignore_sources.php = ['omni']
 ```
 The phpcd will work with deoplete happily.
 
+However if you are experiencing problems with deoplete you can disable the phpcd source.
+
+```viml
+let g:deoplete#ignore_sources = get(g:, 'deoplete#ignore_sources', {})
+let g:deoplete#ignore_sources.php = ['phpcd', 'omni']
+```
+
 ## Usage
 
 ~~First, in the project directory, run `composer install` to install all the dependent packages and generate the autoload file.~~
