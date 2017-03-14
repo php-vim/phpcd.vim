@@ -734,7 +734,71 @@ class PHPCD implements RpcHandler
         ];
     }
 
-    private function getMethodInfo($method, $pattern = null)
+      /**
+     * @param \ReflectionParameter $param
+     * @return string
+     */
+    private function formatParamInfo(\ReflectionParameter $param)
+    {
+        /* @var ReflectionClass|null $hintedClass */
+        $hintedClass = $param->getClass();
+        $paramString = '';
+        if ($hintedClass) {
+            $paramString .= $hintedClass->getName() . ' ';
+        } elseif ($param->hasType()) {
+            $paramString .= $param->getType() . ' ';
+        }
+        $paramString .= '$' . $param->getName();
+        if (!$param->isDefaultValueAvailable()) {
+            return $paramString;
+        }
+        if ($param->isDefaultValueConstant()) {
+            $default = $param->getDefaultValueConstantName();
+        } else {
+            $default = $param->getDefaultValue();
+            if (is_string($default)) {
+                $default = "'$default'";
+            }
+        }
+        $paramString .= " = " . $default;
+        return $paramString;
+    }
+    /**
+     * @param \ReflectionMethod $param
+     * @return string
+     */
+    private function getExtraMethodInfo(\ReflectionMethod $method)
+    {
+        $name = $method->getName();
+        $declaringClass = $method->getDeclaringClass()->getName();
+        $visibility  = $method->isPrivate()   ? 'private'
+                     : $method->isProtected() ? 'protected'
+                     : 'public';
+        $accessMode = $method->isStatic() ? "::" : "->";
+        $paramsInfo = [];
+        foreach ($method->getParameters() as $param) {
+            $paramsInfo[] = $this->formatParamInfo($param);
+        }
+        $returnType = '';
+        if (method_exists($method, 'getReturnType') && $method->hasReturnType()) {
+            $returnType = " : " . (string)$method->getReturnType();
+        }
+        $docblock = preg_replace('/\n[\s]*\*/', "\n *", $method->getDocComment());
+        return sprintf(
+            "%s %s%s%s(\n%s)%s\n%s",
+            $visibility,
+            $name,
+            $accessMode,
+            $declaringClass,
+            count($paramsInfo)
+                ? '    ' . join(",\n    ", $paramsInfo) . "\n"
+                : '',
+            $returnType,
+            $docblock
+        );
+    }
+
+    private function getMethodInfo(\ReflectionMethod $method, $pattern = null)
     {
         $name = $method->getName();
         if ($pattern && !$this->matchPattern($pattern, $name)) {
@@ -750,7 +814,7 @@ class PHPCD implements RpcHandler
         return [
             'word' => $name,
             'abbr' => sprintf("%3s %s (%s)", $modifier, $name, join(', ', $params)),
-            'info' => $this->clearDoc($method->getDocComment()),
+            'info' => $this->getExtraMethodInfo($method),
             'kind' => 'f',
             'icase' => 1,
         ];
