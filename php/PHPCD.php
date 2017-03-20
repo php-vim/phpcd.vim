@@ -787,9 +787,9 @@ class PHPCD implements RpcHandler
         return sprintf(
             "%s %s%s%s(\n%s)%s\n%s",
             $visibility,
-            $name,
-            $accessMode,
             $declaringClass,
+            $accessMode,
+            $name,
             count($paramsInfo)
                 ? '    ' . join(",\n    ", $paramsInfo) . "\n"
                 : '',
