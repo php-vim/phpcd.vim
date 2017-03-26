@@ -216,7 +216,7 @@ class PHPCD implements RpcHandler
                 $reflection = $reflection_class->getMethod($name);
             } else {
                 $class_doc = $this->getAllClassDocComments($reflection_class);
-                $pattern = '/@method\s+(?<type>\S+)\s+?'.$name.'/mi';
+                $pattern = '/@method\s+(?<static>static)?\s*(?<type>\S+)\s+?'.$name.'/mi';
 
                 return $this->matchPatternToDoc($pattern, $class_doc);
             }
@@ -634,7 +634,7 @@ class PHPCD implements RpcHandler
             $all_docs .= $class_doc;
         }
 
-        $has_doc = preg_match_all('/@method\s+(?<types>\S+)\s+(?<names>[a-zA-Z0-9_$]+)\((?<params>.*)\)/mi', $all_docs, $matches);
+        $has_doc = preg_match_all('/@method\s+(?<statics>static)?\s*(?<types>\S+)\s+(?<names>[a-zA-Z0-9_$]+)\((?<params>.*)\)/mi', $all_docs, $matches);
         if (!$has_doc) {
             return [];
         }
