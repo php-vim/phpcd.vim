@@ -39,7 +39,7 @@ class PHPID implements RpcHandler
     {
         list($parent, $interfaces) = $this->getClassInfo($class_name);
 
-        $this->_update($class_name, $parent, $interface);
+        $this->_update($class_name, $parent, $interfaces);
     }
 
     private function _update($class_name, $parent, $interfaces)
