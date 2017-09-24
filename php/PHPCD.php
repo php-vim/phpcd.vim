@@ -25,11 +25,14 @@ class PHPCD implements RpcHandler
 
     private $root;
 
+    private $faced_class = [];
+
     public function __construct($root, Logger $logger, int $disable_modifier = 0, $match_type = self::MATCH_HEAD)
     {
         $this->logger = $logger;
         $this->root = $root;
         $this->disable_modifier = $disable_modifier;
+        $this->addSupportForLaravel();
     }
 
     public function setServer(RpcServer $server)
@@ -93,6 +96,9 @@ class PHPCD implements RpcHandler
      */
     public function info($class_name, $pattern, $static_mode = 'both', $public_only = true)
     {
+        if (isset($this->faced_class[substr($class_name,1)])) {
+            $static_mode = 'both';
+        }
         if ($class_name) {
             $static_mode = $this->translateStaticMode($static_mode);
             return $this->classInfo($class_name, $pattern, $static_mode, $public_only);
@@ -1018,5 +1024,70 @@ class PHPCD implements RpcHandler
                 'icase' => 1,
             ];
         }, array_unique($classmap));
+    }
+
+    /**
+     * Add support for laravel
+     *
+     * @author: xiaohui.lam
+     */
+    private function addSupportForLaravel() {
+        $composer_path = $this->root . '/composer.json';
+
+        if (!is_readable($composer_path)) {
+            return [];
+        }
+
+        $composer = json_decode(file_get_contents($composer_path), true);
+        foreach(isset($composer['require'])?$composer['require']:[] as $package => $ver) {
+            if($package == 'laravel/framework') {
+                // 有使用 laravel 框架
+                // 增加 facades 支持
+                if(file_exists($this->root.'/config/app.php')) {
+                    $config = require_once($this->root.'/config/app.php');
+                    $aliases = isset($config['aliases']) ? $config['aliases'] : [];
+                    if(!is_array($aliases)) $aliases = [];
+                    $require = [
+                        'App' => 'Illuminate\Foundation\Application',
+                        'Artisan' => 'Illuminate\Contracts\Console\Kernel',
+                        'Auth' => 'Illuminate\Auth\AuthManager',
+                        'Blade' => 'Illuminate\View\Compilers\BladeCompiler',
+                        'Bus' => 'Illuminate\Contracts\Bus\Dispatcher',
+                        'Cache' => 'Illuminate\Cache\Repository',
+                        'Config' => 'Illuminate\Config\Repository',
+                        'Cookie' => 'Illuminate\Cookie\CookieJar',
+                        'Crypt' => 'Illuminate\Encryption\Encrypter',
+                        'DB' => 'Illuminate\Database\Capsule\Manager',
+                        'Event' => 'Illuminate\Events\Dispatcher',
+                        'File' => 'Illuminate\Filesystem\Filesystem',
+                        'Gate' => 'Illuminate\Contracts\Auth\Access\Gate',
+                        'Hash' => 'Illuminate\Contracts\Hashing\Hasher',
+                        'Lang' => 'Illuminate\Translation\Translator',
+                        'Log' => 'Illuminate\Log\Writer',
+                        'Mail' => 'Illuminate\Mail\Mailer',
+                        'Notification' => 'Illuminate\Notifications\ChannelManager',
+                        'Password' => 'Illuminate\Auth\Passwords\PasswordBrokerManager',
+                        'Queue' => 'Illuminate\Queue\Capsule\Manager',
+                        'Redirect' => 'Illuminate\Routing\Redirector',
+                        'Redis' => 'Illuminate\Redis\Database',
+                        'Request' => 'Illuminate\Http\Request',
+                        'Response' => 'Illuminate\Contracts\Routing\ResponseFactory',
+                        'Route' => 'Illuminate\Routing\Router',
+                        'Schema' => 'Illuminate\Database\Schema\Blueprint',
+                        'Session' => 'Illuminate\Session\Store',
+                        'Storage' => 'Illuminate\Contracts\Filesystem\Factory',
+                        'URL' => 'Illuminate\Routing\UrlGenerator',
+                        'Validator' => 'Illuminate\Validation\Factory',
+                        'View' => 'Illuminate\View\View',
+                    ];
+                    $aliases = array_merge($aliases, $require);
+                    $this->faced_class = $aliases;
+                    foreach($aliases as $new => $old){
+                        if(!class_exists($new)) class_alias($old, $new);
+                    }
+                }
+                break;
+            }
+        }
     }
 }
