@@ -25,7 +25,7 @@ class PHPCD implements RpcHandler
 
     private $root;
 
-    public function __construct($root, Logger $logger, int $disable_modifier = 0, $match_type = self::MATCH_HEAD)
+    public function __construct($root, Logger $logger, $disable_modifier = 0, $match_type = self::MATCH_HEAD)
     {
         $this->logger = $logger;
         $this->root = $root;
