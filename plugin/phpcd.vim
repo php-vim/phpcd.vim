@@ -11,6 +11,7 @@ let g:phpcd_disable_modifier = 0
 autocmd BufLeave,VimLeave *.php if g:phpcd_need_update > 0 | call phpcd#UpdateIndex() | endif
 autocmd BufWritePost *.php let g:phpcd_need_update = 1
 autocmd FileType php setlocal omnifunc=phpcd#CompletePHP
+autocmd FileType php autocmd BufEnter <buffer> call phpcd#EnterBuffer()
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
