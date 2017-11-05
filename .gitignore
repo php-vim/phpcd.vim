@@ -1,6 +1,5 @@
 /vendor/
 .*
-/vimunit
 composer.lock
 
 # Ignore deoplete source cache
