@@ -1,5 +1,10 @@
 {
     "autoload": {
-        "psr-4": {"PHPCD\\": "PHPCD"}
+        "psr-4": {
+            "PHPCD\\":  "PHPCD/",
+            "Psr4\\":   [ "psr4/", "other-psr4/" ],
+            "":         "psr4-fallback/"
+        },
+        "classmap":  [ "classmap", "Root.php" ]
     }
 }
