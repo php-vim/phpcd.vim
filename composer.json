@@ -7,14 +7,25 @@
         }
     ],
     "autoload": {
-        "psr-4": {"PHPCD\\": "php/"}
+        "psr-4": {
+            "PHPCD\\": "php/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PHPCD\\Tests\\": "tests/"
+        }
     },
     "require": {
         "psr/log": "^1.0",
         "lvht/msgpack-rpc": "^0.2.1",
         "monolog/monolog": "^1.20",
         "ext-json": "*",
-        "nikic/PHP-Parser": "^3.1"
+        "nikic/PHP-Parser": "^3.1",
+        "beberlei/assert": "^2.7"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^6.4"
     },
     "config": {
       "classmap-authoritative": true

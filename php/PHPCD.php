@@ -5,6 +5,13 @@ use Psr\Log\LoggerInterface as Logger;
 use Lvht\MsgpackRpc\Server as RpcServer;
 use Lvht\MsgpackRpc\Handler as RpcHandler;
 
+use PHPCD\Matcher\StringMatcher;
+use PHPCD\Matcher\StringStartsWithMatcher;
+use PHPCD\Matcher\StringContainsMatcher;
+use PHPCD\Matcher\SimpleClassNameMatcher;
+use PHPCD\ClassFinder\ComposerClassFinder;
+use PHPCD\Reflection\ReflectionClass;
+
 class PHPCD implements RpcHandler
 {
     const MATCH_SUBSEQUENCE = 'match_subsequence';
@@ -30,6 +37,8 @@ class PHPCD implements RpcHandler
         $this->logger = $logger;
         $this->root = $root;
         $this->disable_modifier = $disable_modifier;
+
+        $this->setMatchType($match_type);
     }
 
     public function setServer(RpcServer $server)
@@ -997,37 +1006,47 @@ class PHPCD implements RpcHandler
 
     public function classmap($pattern)
     {
-        $use_fqdn = isset($pattern[0]) && $pattern[0] === "\\";
-        $pattern = trim($pattern, "\\");
-        $classmap_file = $this->root.'/vendor/composer/autoload_classmap.php';
-        $defined = array_merge(get_declared_traits(),
-            get_declared_interfaces(), get_declared_classes());
+        $classFinder  = new ComposerClassFinder($this->logger, $this->root . '/vendor/autoload.php');
+        $classMatcher = new SimpleClassNameMatcher(
+            new StringContainsMatcher(StringMatcher::CASE_INSENSITIVE),
+            new StringStartsWithMatcher(StringMatcher::CASE_INSENSITIVE)
+        );
 
-        if (is_readable($classmap_file)) {
-            $_classmap = require $classmap_file;
-            if ($_classmap) {
-                $defined = array_merge($defined, array_keys($_classmap));
+        $matches = $classFinder->find($pattern, $classMatcher);
+
+        foreach ($matches as $name) {
+            try {
+                $reflection = new ReflectionClass($name);
+
+                $classmap[] = [
+                    /** @todo change abbr and add menu as proposal */
+                    'word' => $reflection->getName(),
+                    'abbr' => $reflection->getShortName(),
+                    'menu' => $reflection->getNamespaceName(),
+                    'info' => $reflection->getDocComment(),
+                    'kind' => $reflection->isTrait() ? 't'
+                        : $reflection->isInterface() ? 'i'
+                        : 'c',
+                    'icase' => 1,
+                ];
+            } catch (\ReflectionException $exception) {
+                /**
+                 * For example in this project there is a fake project in the "tests"
+                 * directory.
+                 * Among other things, the class finder will return a match for a class :
+                 * PHPCD\Tests\fixtures\vendor\composer\ClassLoader
+                 *
+                 * The only solution I can think of is to check for every file in the class finder
+                 * and verify that they are indeed classes (kind of like composer classmap).
+                 * But I'm affraid it would be too long :
+                 * @todo do some testing to get a feeling about it.
+                 *
+                 * Meanwhile I decide to log it as a notice and just consider it as normal.
+                 */
+                $this->logger->notice($exception->getMessage());
             }
         }
 
-        $classmap = [];
-        foreach ($defined as $name) {
-            if ($this->matchPattern($pattern, $name)) {
-                $classmap[] = $name;
-            }
-        }
-
-        return array_map(function ($name) use($use_fqdn) {
-            if ($use_fqdn) {
-                $name = "\\".$name;
-            }
-            return [
-                'word' => $name,
-                'abbr' => $name,
-                'info' => '',
-                'kind' => 't',
-                'icase' => 1,
-            ];
-        }, array_unique($classmap));
+        return [ 'words' => $classmap ];
     }
 }
