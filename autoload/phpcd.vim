@@ -979,24 +979,32 @@ endfunction " }}}
 
 function! phpcd#GetCallChainReturnTypeAt(line) " {{{
 	silent! below 1sp
-	exec 'normal! ' . a:line . 'G'
-	call search(';')
-	let [_, context, namespace, imports] = phpcd#GetCurrentSymbolWithContext()
-	let classname = phpcd#GetClassName(line('.'), context, namespace, imports)
-	q
+	let classname = ''
+	try
+		exec 'normal! ' . a:line . 'G'
+		call search(';')
+		let [_, context, namespace, imports] = phpcd#GetCurrentSymbolWithContext()
+		let classname = phpcd#GetClassName(line('.'), context, namespace, imports)
+	finally
+		q
+	endtry
 	return classname
 endfunction " }}}
 
 function! phpcd#GetTypeAt(line, context) " {{{
 	silent! below 1sp
-	exec 'normal! ' . a:line . 'G'
-	call search(';')
-	normal beh
-	let [_, context, namespace, imports] = phpcd#GetCurrentSymbolWithContext()
-	let instruction = phpcd#GetCurrentInstruction(line('.'), col('.'), [0,0])
-	let context = instruction.a:context
-	let classname = phpcd#GetClassName(line('.'), context, namespace, imports)
-	q
+	let classname = ''
+	try
+		exec 'normal! ' . a:line . 'G'
+		call search(';')
+		normal beh
+		let [_, context, namespace, imports] = phpcd#GetCurrentSymbolWithContext()
+		let instruction = phpcd#GetCurrentInstruction(line('.'), col('.'), [0,0])
+		let context = instruction.a:context
+		let classname = phpcd#GetClassName(line('.'), context, namespace, imports)
+	finally
+		q
+	endtry
 	return classname
 endfunction " }}}
 
