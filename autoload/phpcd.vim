@@ -641,6 +641,10 @@ function! phpcd#GetClassName(start_line, context, current_namespace, imports) " 
 	let class_candidate_imports = a:imports
 	let methodstack = phpcd#GetMethodStack(a:context) " }}}
 
+	if empty(methodstack)
+		return ''
+	endif
+
 	if methodstack[-1] =~# '\vmake|app|get' " {{{
 		" just for laravel and container-interop
 		let container_interface = matchstr(methodstack[-1], '^\(make\|app\|get\)(\zs.\+\ze::class)')
