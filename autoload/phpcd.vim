@@ -1027,7 +1027,7 @@ function! phpcd#GetRoot() " {{{
 	let pwd = expand("%:p:h")
 
 	if pwd[0] != '/' " for editing non exists dir file
-		let pwd = '/'
+		let pwd = getcwd()
 	endif
 
 	let root = pwd
