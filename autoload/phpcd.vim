@@ -56,7 +56,7 @@ function! phpcd#CompletePHP(findstart, base) " {{{
 
 		let [current_namespace, imports] = phpcd#GetCurrentNameSpace()
 
-		if context =~? '\v^use\s*' " {{{
+		if context =~# '\v^(use$|use+\s.*)' " {{{
 			return rpc#request(g:phpcd_channel_id, 'classmap', a:base)
 		endif " }}}
 
