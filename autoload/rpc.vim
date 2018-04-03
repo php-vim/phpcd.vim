@@ -22,6 +22,12 @@ function! rpc#notify(...) " {{{
 	end
 endfunction " }}}
 
+function! s:warn(k, v) abort
+	echohl WarningMsg
+	echom a:v
+	echohl None
+endfunction
+
 function! s:OnCall(status, response) " {{{
 	let msg = json_decode(a:response)
 	if len(msg) != 3
@@ -41,12 +47,11 @@ function! s:OnError(a, b, c) " {{{
 	if msg =~# '^PHP Parse' && len(a:b) > 1
 		let msg = a:b[1]
 	endif
-
-	echo substitute(msg, escape(getcwd() . '/', '.'), '', 'g')
+	call map(split(substitute(msg, escape(getcwd() . '/', '.'), '', 'g'), "\n"), function('s:warn'))
 endfunction
 
 function! s:OnError2(a, b)
-	echo a:b
+	call map(split(a:b, "\n"), function('s:warn'))
 endfunction " }}}
 
 function! rpc#start(...) " {{{
