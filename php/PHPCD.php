@@ -273,7 +273,7 @@ class PHPCD implements RpcHandler
 
         $doc = $reflection->getDocComment();
 
-        if ($is_method && preg_match('/@inheritDoc/', $doc)) {
+        if ($is_method && preg_match('/{?@{?inheritdoc}?/', $doc)) {
             $reflection = $this->getReflectionFromInheritDoc($reflection_class, $name);
             $doc = $reflection->getDocComment();
         }
@@ -332,8 +332,8 @@ class PHPCD implements RpcHandler
         if ($parent_class) {
             $reflection_method = $parent_class->getMethod($method_name);
             $doc = $reflection_method->getDocComment();
-            if (preg_match('/@inheritDoc/', $doc)) {
-                $reflection_method = $this->getInheritDoc($parent_class, $method_name);
+            if (preg_match('/{?@{?inheritdoc}?/', $doc)) {
+                $reflection_method = $this->getReflectionFromInheritDoc($parent_class, $method_name);
             }
         }
 
