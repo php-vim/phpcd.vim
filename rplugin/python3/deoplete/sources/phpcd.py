@@ -1,5 +1,5 @@
 from .base import Base
-from neovim.api.nvim import NvimError
+from pynvim.api.nvim import NvimError
 
 class Source(Base):
     def __init__(self, vim):
