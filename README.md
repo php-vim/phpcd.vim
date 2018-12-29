@@ -28,6 +28,7 @@ PHPCD consists of two parts. On part is written in VimL (mainly based on phpcomp
      - Recognize array of objects via docblock like `$foo[42]->` or for variables created in `foreach`
      - Recognize property type by assignment in `__construct`
      - Recognize property type by **setter**
+ * Namespace autocompletion (you first need to do `composer dump-autoload -o`)
  * Displays docblock info in the preview for methods and properties
  * Support built-in class support with constants, methods and properties
  * Enhanced jump-to-definition on <kbd>ctrl</kbd>+<kbd>]</kbd>
