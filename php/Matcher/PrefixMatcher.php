@@ -9,6 +9,6 @@ class PrefixMatcher implements Matcher
             return true;
         }
 
-        return substr($target, 0, strlen($pattern)) === $pattern;
+        return preg_match('/^' . preg_quote($pattern, '/') . '/i', $target);
     }
 }
