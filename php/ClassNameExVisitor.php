@@ -42,7 +42,7 @@ class ClassNameExVisitor extends NodeVisitorAbstract
                 }
 
                 if ($use->type !== Node\Stmt\Use_::TYPE_CONSTANT) {
-                    $this->imports[$alias] = (string)$use->name;
+                    $this->imports[(string)$alias] = (string)$use->name;
                 }
             }
         }
