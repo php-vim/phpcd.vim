@@ -870,9 +870,8 @@ class PHPCD implements RpcHandler
     {
         $name = $method->getName();
         $declaringClass = $method->getDeclaringClass()->getName();
-        $visibility  = ($method->isPrivate() ? 'private' : $method->isProtected())
-                     ? 'protected'
-                     : 'public';
+        $visibility  = $method->isPrivate() ? 'private' :
+                       ($method->isProtected() ? 'protected' : 'public');
         $accessMode = $method->isStatic() ? "::" : "->";
         $paramsInfo = [];
         foreach ($method->getParameters() as $param) {
