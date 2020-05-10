@@ -61,16 +61,14 @@ And then execute `:PlugInstall` in the command mode.
 If you using the [deoplete](https://github.com/Shougo/deoplete.nvim), you can add the following lines to you init.vim
 
 ```viml
-let g:deoplete#ignore_sources = get(g:, 'deoplete#ignore_sources', {})
-let g:deoplete#ignore_sources.php = ['omni']
+call deoplete#custom#option('ignore_sources', {'php': ['omni']})
 ```
 The phpcd will work with deoplete happily.
 
 However if you are experiencing problems with deoplete you can disable the phpcd source.
 
 ```viml
-let g:deoplete#ignore_sources = get(g:, 'deoplete#ignore_sources', {})
-let g:deoplete#ignore_sources.php = ['phpcd', 'omni']
+call deoplete#custom#option('ignore_sources', {'php': ['phpcd', 'omni']})
 ```
 
 ## Usage
