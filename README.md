@@ -89,7 +89,7 @@ The default PHP command used to run PHP parts of daemon is simply `php`. You may
 let g:phpcd_php_cli_executable = 'php7.0'
 ```
 
-Use <kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>o</kbd> to complete and use <kbd>ctrl</kbd>+<kbd>]</kbd> to go to the defination.
+Use <kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>o</kbd> to complete and use <kbd>ctrl</kbd>+<kbd>]</kbd> to go to the definition.
 
 If you use neosnippet, you may like to set `g:phpcd_disable_modifier` to `0`.
 
