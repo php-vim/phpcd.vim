@@ -30,6 +30,27 @@ if ($messenger == 'json') {
     $messenger = new MsgpackMessenger(new StdIo());
 }
 
+$composer_file = $root."/composer.json";
+
+if (is_readable($composer_file)) {
+    $composer = json_decode(file_get_contents($composer_file), true);
+
+    if (isset($composer["config"]["vendor-dir"])) {
+        $home = getenv("HOME");
+
+        $vendor_dir = $composer["config"]["vendor-dir"];
+        if ($vendor_dir[0] == '~') {
+            $vendor_dir = str_replace("~", $home, $vendor_dir);
+        } elseif (substr($vendor_dir, 0, 5) == '$HOME') {
+            $vendor_dir = str_replace("$HOME", $home, $vendor_dir);
+        } elseif ($vendor_dir[0] != '/') {
+            $vendor_dir = $root.'/'.$vendor_dir;
+        }
+
+        $autoload_file = $vendor_dir."/autoload.php";
+    }
+}
+
 /** load autoloader for the project **/
 if (is_readable($autoload_file)) {
     require $autoload_file;

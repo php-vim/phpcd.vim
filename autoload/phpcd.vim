@@ -1056,7 +1056,7 @@ function! phpcd#GetRoot() " {{{
 
 	let root = pwd
 	while root != "/"
-		if (filereadable(root . "/vendor/autoload.php"))
+		if (filereadable(root . "/composer.json"))
 			return root
 		endif
 		let root = fnamemodify(root, ":h")
