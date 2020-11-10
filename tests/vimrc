@@ -2,5 +2,13 @@ filetype plugin indent on
 syntax on
 set virtualedit+=onemore
 
+"vimunit uses a lot of line-continuations which vim 8.0 only likes is 
+"nocompatible mode
+"see https://stackoverflow.com/questions/6696079/vimrc-causes-error-e10-should-be-followed-by-or/6696615
+set nocompatible
+
+"vimunit seems to have problems if the language is not setted to English
+language C.UTF-8
+
 let p = fnamemodify(expand('%:p:h'), ':h')
 exe 'set rtp='.p.'/,'.p.'/../vimunit/,'.&rtp

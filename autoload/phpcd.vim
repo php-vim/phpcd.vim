@@ -545,7 +545,7 @@ function! phpcd#GetCallChainReturnType(classname_candidate, class_candidate_name
 	endif " }}}
 
 	if (len(methodstack) == 1) " {{{
-		let [classname_candidate, class_candidate_namespace] = phpcd#ExpandClassName(classname_candidate, class_candidate_namespace, imports)
+		"let [classname_candidate, class_candidate_namespace] = phpcd#ExpandClassName(classname_candidate, class_candidate_namespace, imports)
 		let return_type = s:GetFullName(class_candidate_namespace, classname_candidate)
 
 		return return_type
